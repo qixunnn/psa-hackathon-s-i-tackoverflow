@@ -7,30 +7,30 @@
 
 # 1. Architecture Goal
 
-PSA Global Watch is designed as a lightweight decision-support platform that transforms global maritime disruptions into structured operational intelligence.
+PSA Global Watch is designed as a lightweight three-agent decision-support platform that transforms global maritime disruptions into structured operational intelligence.
 
-The architecture must support the following core workflow:
+The architecture must support the following agentic workflow:
 
 ```text
 External Event
       │
       ▼
-Maritime Relevance
+Global Watch Agent
       │
       ▼
-Event Intelligence
+Persistent Event Memory
       │
       ▼
-Route Exposure
+Scenario & Risk Agent
       │
       ▼
-Scenario Analysis
+Deterministic Scenario Engine
       │
       ▼
-Potential PSA Impact
+Advisory Agent
       │
       ▼
-Monitor / Prepare
+Potential PSA Impact + Monitor / Prepare
 ```
 
 The system is designed for hackathon delivery first.
@@ -144,6 +144,55 @@ Operational decisions remain with human users.
 
 ---
 
+## 2.5 Three-Agent Boundary
+
+The MVP uses three AI agents with clearly separated responsibilities.
+
+### Global Watch Agent
+
+Responsible for understanding new external information and maintaining the system's evolving view of a maritime disruption.
+
+Responsibilities include:
+
+- maritime relevance classification
+- structured event extraction
+- evidence extraction
+- event-match suggestion
+- event update suggestions
+
+The Global Watch Agent reads and interprets information. Deterministic application logic validates its output and decides whether an Event is created or updated.
+
+### Scenario & Risk Agent
+
+Responsible for deciding how an Event should be analysed using the system's maritime knowledge and predefined analytical tools.
+
+Responsibilities include:
+
+- interpreting route and chokepoint context
+- selecting an appropriate predefined scenario template
+- identifying required scenario parameters from validated evidence
+- interpreting deterministic scenario outputs
+- producing a structured risk assessment
+
+The Scenario & Risk Agent does not invent mathematical models or calculate simulation results itself.
+
+### Advisory Agent
+
+Responsible for converting validated Event state and scenario results into PSA-facing decision support.
+
+Responsibilities include:
+
+- summarising potential operational implications
+- generating Monitor recommendations
+- generating Prepare recommendations
+- explaining why the recommendations follow from the available evidence and model outputs
+
+The Advisory Agent remains advisory and cannot execute operational actions.
+
+The three agents share persistent Event state through the backend and database rather than through hidden conversational memory.
+
+---
+
 # 3. High-Level Architecture
 
 ```text
@@ -164,13 +213,12 @@ Operational decisions remain with human users.
                     │
                     ▼
 ┌───────────────────────────────────────┐
-│       Global Watch Intelligence       │
+│          Global Watch Agent           │
 │                                       │
 │  • maritime relevance                │
 │  • structured extraction             │
 │  • evidence extraction               │
 │  • event-match suggestion            │
-│  • scenario-template selection       │
 └───────────────────┬───────────────────┘
                     │
                     ▼
@@ -197,6 +245,16 @@ Operational decisions remain with human users.
                     │
                     ▼
 ┌───────────────────────────────────────┐
+│        Scenario & Risk Agent          │
+│                                       │
+│  • interpret route exposure          │
+│  • select scenario template          │
+│  • prepare validated parameters      │
+│  • interpret model outputs           │
+└───────────────────┬───────────────────┘
+                    │
+                    ▼
+┌───────────────────────────────────────┐
 │          Scenario Engine              │
 │                                       │
 │  • predefined scenario templates      │
@@ -207,7 +265,7 @@ Operational decisions remain with human users.
                     │
                     ▼
 ┌───────────────────────────────────────┐
-│      Operational Impact Layer         │
+│            Advisory Agent             │
 │                                       │
 │  • potential PSA relevance            │
 │  • Monitor recommendations            │
@@ -357,45 +415,45 @@ Replay and live sources should feed the same processing path.
 
 ---
 
-# 6. Global Watch Intelligence Pipeline
+# 6. Agentic Intelligence Pipeline
 
-The Global Watch pipeline is the core of the system.
+The three-agent pipeline is the core of the system.
 
 ```text
 Article
    │
    ▼
-Maritime Relevance
+GLOBAL WATCH AGENT
+   │
+   ├─ Maritime Relevance
    │
    ├── irrelevant → stop
    │
-   ▼
-Structured Event Extraction
-   │
-   ▼
-Evidence Extraction
-   │
-   ▼
-Existing Event Match
+   ├─ Structured Event Extraction
+   ├─ Evidence Extraction
+   └─ Existing Event Match
    │
    ├── existing → update Event
    │
    └── new      → create Event
    │
    ▼
-Route / Chokepoint Mapping
+PERSISTENT EVENT MEMORY
    │
    ▼
-Scenario Template Selection
+SCENARIO & RISK AGENT
+   │
+   ├─ Route / Chokepoint Context
+   └─ Scenario Template Selection
    │
    ▼
-Scenario Analysis
+DETERMINISTIC SCENARIO ENGINE
    │
    ▼
-Operational Impact
+ADVISORY AGENT
    │
-   ▼
-Monitor / Prepare
+   ├─ Operational Impact
+   └─ Monitor / Prepare
 ```
 
 Each major stage should create an Activity Log entry.
@@ -586,11 +644,11 @@ The MVP does not require a full global shipping network graph.
 
 ---
 
-# 12. Scenario Engine
+# 12. Scenario & Risk Agent and Scenario Engine
 
-The Scenario Engine converts an Event into a transparent what-if analysis.
+The Scenario & Risk Agent decides which predefined analytical tool is appropriate for an Event and prepares validated inputs. The Scenario Engine then performs the transparent what-if analysis.
 
-The LLM may select a predefined scenario template.
+The Scenario & Risk Agent may select a predefined scenario template.
 
 It must not generate the mathematical model.
 
@@ -683,9 +741,9 @@ Incorrect language:
 
 ---
 
-# 15. Operational Impact Layer
+# 15. Advisory Agent
 
-Scenario outputs are translated into potential operational implications.
+The Advisory Agent translates validated Event state and deterministic scenario outputs into potential operational implications.
 
 Examples:
 
@@ -760,26 +818,24 @@ Example:
 The Activity Log should capture:
 
 - stage
+- responsible agent
 - timestamp
 - event ID where applicable
 - action
 - concise result
 - success/failure status
 
-It should show:
+It should make the multi-agent handoff visible without exposing private chain-of-thought. A typical sequence is:
 
 ```text
-Observe
-  ↓
-Interpret
-  ↓
-Verify
-  ↓
-Model
-  ↓
-Assess
-  ↓
-Recommend
+Global Watch Agent
+  Observe → Interpret → Verify
+                 ↓
+Scenario & Risk Agent
+  Model → Assess
+                 ↓
+Advisory Agent
+  Recommend
 ```
 
 ---
@@ -949,7 +1005,7 @@ Replay article
 Normalize article
       │
       ▼
-Check maritime relevance
+Global Watch Agent checks maritime relevance
       │
       ▼
 Extract structured facts
@@ -964,16 +1020,19 @@ Create or update Event
 Update evidence + timeline
       │
       ▼
-Resolve route exposure
+Persist / update Event memory
+      │
+      ▼
+Scenario & Risk Agent resolves route exposure
       │
       ▼
 Select predefined scenario
       │
       ▼
-Run deterministic model
+Run deterministic scenario engine
       │
       ▼
-Generate operational interpretation
+Advisory Agent generates operational interpretation
       │
       ▼
 Generate Monitor / Prepare

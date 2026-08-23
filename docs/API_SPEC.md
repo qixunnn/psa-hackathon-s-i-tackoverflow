@@ -807,6 +807,7 @@ Returns system Activity Log entries.
 ```text
 eventId
 articleId
+agent
 stage
 status
 limit
@@ -833,6 +834,7 @@ GET /api/v1/activity?eventId=EVT-001
       "timestamp": "2026-08-23T12:03:04Z",
       "eventId": "EVT-001",
       "articleId": "ART-004",
+      "agent": "GLOBAL_WATCH",
       "stage": "VERIFY",
       "action": "Independent source added",
       "result": "Confidence updated from 0.71 to 0.84",
@@ -855,6 +857,37 @@ interface ActivityListResponse {
 ```
 
 The Activity API must never expose hidden chain-of-thought.
+
+The `agent` field identifies which component produced the activity entry and must use the `AgentType` enum defined in `DATA_SPEC.md`:
+
+```text
+GLOBAL_WATCH
+SCENARIO_RISK
+ADVISORY
+SYSTEM
+```
+
+Examples:
+
+```json
+{
+  "agent": "SCENARIO_RISK",
+  "stage": "MODEL",
+  "action": "Scenario selected",
+  "result": "CarrierReroutingScenario",
+  "status": "SUCCESS"
+}
+```
+
+```json
+{
+  "agent": "ADVISORY",
+  "stage": "RECOMMEND",
+  "action": "Advisory refreshed",
+  "result": "Monitor and Prepare recommendations generated",
+  "status": "SUCCESS"
+}
+```
 
 ---
 

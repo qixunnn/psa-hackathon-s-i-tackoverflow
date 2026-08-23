@@ -1,7 +1,7 @@
 # TEAM_CONVENTIONS.md
 
 **Project:** PSA Global Watch
-**Version:** 1.0
+**Version:** 1.1
 
 ---
 
@@ -21,37 +21,42 @@ Update the documentation first before changing the implementation.
 
 # 2. Team Roles
 
-## Member 1 — Global Watch / AI
+## Member 1 — Global Watch Agent / AI
 
 Responsible for:
 
-- Article ingestion
-- Maritime relevance
-- Structured extraction
-- Event matching
+- Article ingestion and normalization support
+- Maritime relevance classification
+- Structured event extraction
 - Evidence extraction
-- Confidence inputs
-- Prompt engineering
+- Event-match suggestions
+- Confidence input signals
+- Global Watch Agent prompts and structured outputs
 
 Owns:
 
 ```
-/backend/ai
-/prompts
+/backend/ai/global_watch
+/prompts/global_watch
 ```
+
+Member 1 owns the **Global Watch Agent**, but does not independently change shared Event schemas, final confidence rules, or API contracts.
 
 ---
 
-## Member 2 — Backend / Data
+## Member 2 — Backend / Data / Orchestration
 
 Responsible for:
 
 - FastAPI
-- Database
-- API
-- Event persistence
-- Activity Log
-- Authentication (if required)
+- Database and Supabase integration
+- API implementation
+- Event persistence and Event Evolution
+- Deterministic event matching thresholds
+- Deterministic confidence and severity rules
+- Three-agent workflow orchestration
+- Activity Log persistence
+- Authentication only if required by the MVP
 
 Owns:
 
@@ -59,28 +64,41 @@ Owns:
 /backend/api
 /backend/db
 /backend/models
+/backend/services
 ```
+
+Member 2 owns the deterministic application flow connecting the agents. Agent handoffs must use validated shared models rather than free-form text.
 
 ---
 
-## Member 3 — Scenario / Risk
+## Member 3 — Scenario & Risk + Advisory AI
 
 Responsible for:
 
-- Maritime knowledge
-- Chokepoints
-- Route exposure
-- Scenario engine
-- Monte Carlo
-- Operational impact
-- Monitor / Prepare
+- Maritime Knowledge Layer
+- Chokepoints and trade corridors
+- Route Exposure
+- Scenario & Risk Agent
+- Predefined deterministic scenario engine
+- Monte Carlo where appropriate
+- Scenario assumptions and provenance
+- Scenario result interpretation
+- Advisory Agent
+- Operational Impact
+- Monitor / Prepare recommendations
 
 Owns:
 
 ```
+/backend/ai/scenario_risk
+/backend/ai/advisory
 /backend/scenario
 /backend/risk
+/prompts/scenario_risk
+/prompts/advisory
 ```
+
+Member 3 owns both downstream AI agents for the MVP. The agents may select, interpret and explain, but deterministic scenario code performs calculations.
 
 ---
 
@@ -88,11 +106,16 @@ Owns:
 
 Responsible for:
 
-- Dashboard
+- Global Risk Overview
 - Event Detail
-- Timeline
+- Event Evolution timeline
+- Evidence and source presentation
+- Route Exposure presentation
 - Scenario Lab
+- Operational Impact
+- Monitor / Prepare presentation
 - Activity Log
+- Agent-handoff visualisation
 - UX
 
 Owns:
@@ -100,6 +123,8 @@ Owns:
 ```
 /frontend
 ```
+
+The frontend must consume backend APIs and must not recreate agent or scenario business logic client-side.
 
 ---
 
@@ -132,8 +157,9 @@ main
  │
  ├── feature/frontend-dashboard
  ├── feature/event-engine
- ├── feature/scenario-engine
- └── feature/ai-pipeline
+ ├── feature/global-watch-agent
+ ├── feature/scenario-risk-agent
+ └── feature/advisory-agent
 ```
 
 Each feature should be completed through a Pull Request.
@@ -230,6 +256,22 @@ A feature is complete only if:
 
 ✅ No hardcoded secrets
 
+For AI-agent features:
+
+✅ Output follows the structured schema in `DATA_SPEC.md`
+
+✅ Output is validated before persistence or downstream use
+
+✅ Major agent actions create Activity Log entries
+
+For scenario features:
+
+✅ Calculations remain deterministic
+
+✅ Assumptions and provenance are visible
+
+✅ Scenario language does not present simulations as guaranteed predictions
+
 ---
 
 # 9. Documentation First
@@ -294,7 +336,23 @@ Prompt outputs must be structured.
 
 Never trust raw LLM text.
 
-Always validate before saving.
+Always validate before saving or passing output to another agent.
+
+The three MVP agents are:
+
+```text
+GLOBAL_WATCH
+SCENARIO_RISK
+ADVISORY
+```
+
+Agents communicate through validated domain objects and persistent Event state.
+
+Do not pass hidden chain-of-thought between agents.
+
+The LLM may interpret, select and explain.
+
+Deterministic code must perform validation, calculations, confidence/severity rules and policy enforcement.
 
 ---
 
@@ -370,14 +428,13 @@ Flow:
 
 ```
 Frontend
-
-↓
-
-FastAPI
-
-↓
-
-OpenAI
+   ↓
+FastAPI / Workflow Orchestrator
+   ├── Global Watch Agent
+   ├── Scenario & Risk Agent
+   └── Advisory Agent
+            ↓
+Deterministic services / database
 ```
 
 All AI calls stay server-side.
@@ -421,11 +478,20 @@ Frontend
 - Handles loading state
 - Handles error state
 
+AI Agents
+
+- Structured output validates
+- Invalid output fails safely
+- Agent handoff uses shared domain models
+- Activity Log identifies the responsible agent
+- No hidden chain-of-thought is exposed
+
 Scenario
 
 - Deterministic outputs
-- Assumptions displayed
+- Assumptions and provenance displayed
 - Disclaimer shown
+- LLM does not invent mathematical models
 
 ---
 
@@ -438,17 +504,31 @@ Provide context.
 Good prompt:
 
 ```
-Implement POST /api/v1/events
+Implement the Global Watch article-processing vertical slice.
 
-Follow DATA_SPEC.md
+Read first:
+- PRODUCT_SPEC.md
+- ARCHITECTURE.md
+- DATA_SPEC.md
+- API_SPEC.md
+- TEAM_CONVENTIONS.md
 
-Follow API_SPEC.md
+Implement only:
+POST /api/v1/articles/process
 
-Use FastAPI
+Follow DATA_SPEC.md and API_SPEC.md exactly.
 
-Do not invent fields.
+Use FastAPI and Pydantic.
 
-Return mock data only.
+The Global Watch Agent must return structured output.
+
+Validate AI output before persistence.
+
+Do not let the LLM set final confidence or severity.
+
+Record major processing stages in the Activity Log.
+
+Do not invent fields or add unrelated features.
 ```
 
 Avoid vague prompts like:
@@ -494,39 +574,41 @@ The project is demo-ready when the following flow works end-to-end:
 
 ```
 Replay Article
-
-↓
-
-Event Created
-
-↓
-
-Event Timeline Updates
-
-↓
-
-Route Exposure Displayed
-
-↓
-
-Scenario Runs
-
-↓
-
+      ↓
+Global Watch Agent
+      ↓
+Event Created / Updated
+      ↓
+Evidence + Event Evolution Updated
+      ↓
+Scenario & Risk Agent
+      ↓
+Route Exposure Resolved
+      ↓
+Predefined Scenario Selected
+      ↓
+Deterministic Scenario Engine Runs
+      ↓
+Scenario & Risk Agent Interprets Results
+      ↓
+Advisory Agent
+      ↓
 Operational Impact Generated
-
-↓
-
+      ↓
 Monitor / Prepare Recommendations
-
-↓
-
+      ↓
 Dashboard Updates
-
-↓
-
-Activity Log Updated
+      ↓
+Activity Log Shows Agent Handoffs
 ```
+
+The Activity Log should make this sequence visible:
+
+```text
+GLOBAL_WATCH → SCENARIO_RISK → ADVISORY
+```
+
+The three-agent workflow is part of the MVP, not a stretch goal.
 
 Everything else is a bonus.
 

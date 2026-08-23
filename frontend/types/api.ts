@@ -37,6 +37,20 @@ export interface RouteExposure {
   resolved: boolean;
 }
 
+export interface Development {
+  id: string;
+  eventId: string;
+  timestamp: string;
+  title: string;
+  summary: string;
+  sourceIds: string[];
+  evidenceIds: string[];
+  previousSeverity?: Severity;
+  newSeverity?: Severity;
+  previousConfidence?: number;
+  newConfidence?: number;
+}
+
 export interface Event {
   id: string;
   title: string;
@@ -80,8 +94,31 @@ export interface EventDetailResponse {
   event: Event;
   sources: unknown[];
   evidence: unknown[];
-  developments: unknown[];
+  developments: Development[];
   latestScenarioRun?: unknown | null;
   latestOperationalImpact?: unknown | null;
   recommendations: unknown[];
+}
+
+export interface DemoArticleSummary {
+  id: string;
+  title: string;
+  publishedAt: string;
+  processed: boolean;
+}
+
+export interface ProcessArticleResponse {
+  articleId: string;
+  maritimeRelevant: boolean;
+  eventAction: "CREATED" | "UPDATED" | "NONE";
+  eventId?: string | null;
+  message: string;
+}
+
+export interface ApiErrorResponse {
+  error: {
+    code: string;
+    message: string;
+    details: Record<string, unknown> | null;
+  };
 }

@@ -210,6 +210,17 @@ TRADE_RESTRICTION
 
 ---
 
+## 3.10 AgentType
+
+```text
+GLOBAL_WATCH
+SCENARIO_RISK
+ADVISORY
+SYSTEM
+```
+
+---
+
 # 4. Canonical Article
 
 `Article` represents normalized source content entering the intelligence pipeline.
@@ -1051,6 +1062,8 @@ interface ActivityLog {
   eventId?: string;
   articleId?: string;
 
+  agent: AgentType;
+
   stage: ActivityStage;
 
   action: string;
@@ -1071,6 +1084,7 @@ Example:
   "timestamp": "2026-08-23T12:03:04Z",
   "eventId": "EVT-001",
   "articleId": "ART-004",
+  "agent": "GLOBAL_WATCH",
   "stage": "VERIFY",
   "action": "Independent source added",
   "result": "Confidence updated from 0.71 to 0.84",
@@ -1082,6 +1096,7 @@ The Activity Log must not contain private chain-of-thought.
 
 It may contain:
 
+- responsible agent identity
 - actions performed
 - structured reasons
 - evidence references
@@ -1199,6 +1214,59 @@ interface EventMatchSuggestion {
 The LLM may generate this suggestion.
 
 The backend must apply deterministic thresholds before deciding whether the article updates an existing Event.
+
+---
+
+# 23A. Agent Data Responsibilities
+
+The three AI agents use the shared domain objects defined in this document rather than maintaining incompatible private representations.
+
+## Global Watch Agent
+
+Primary inputs:
+
+- `Article`
+- existing `Event` summaries where matching is required
+
+Primary structured outputs:
+
+- `MaritimeRelevanceResult`
+- `EventExtractionResult`
+- `EventMatchSuggestion`
+- extracted evidence claims
+
+The final persisted Event, confidence and severity remain controlled by deterministic backend logic.
+
+## Scenario & Risk Agent
+
+Primary inputs:
+
+- validated `Event`
+- `RouteExposure`
+- Maritime Knowledge Layer data
+
+Primary structured outputs:
+
+- selected `ScenarioType`
+- proposed scenario parameters/assumptions for validation
+- structured interpretation of `ScenarioRun` results
+
+Numerical scenario outputs are produced by deterministic scenario code, not by the agent.
+
+## Advisory Agent
+
+Primary inputs:
+
+- validated `Event`
+- `ScenarioRun`
+- route exposure and evidence context
+
+Primary structured outputs:
+
+- `OperationalImpact`
+- `Recommendation[]` of type `MONITOR` or `PREPARE`
+
+The Advisory Agent cannot execute operational actions.
 
 ---
 
