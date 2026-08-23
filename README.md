@@ -170,3 +170,25 @@ the `backend` directory with:
 ```bash
 pytest
 ```
+
+## Run the Frontend Locally
+
+In a second terminal, from the repository root:
+
+```bash
+cd frontend
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`. The local frontend expects the FastAPI backend at
+`http://localhost:8000`; change `NEXT_PUBLIC_API_BASE_URL` in `.env.local` if the
+backend is running elsewhere.
+
+Run frontend checks from the `frontend` directory:
+
+```bash
+npm run lint
+npm run build
+```
