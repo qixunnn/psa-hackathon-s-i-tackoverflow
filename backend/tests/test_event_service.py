@@ -4,7 +4,8 @@ from tests.fakes import InMemoryEventRepository
 
 
 def test_list_event_summaries_uses_persisted_events() -> None:
-    service = EventService(InMemoryEventRepository([make_event()]))
+    repository = InMemoryEventRepository([make_event()])
+    service = EventService(repository, repository)
 
     response = service.list_event_summaries()
 
@@ -15,7 +16,8 @@ def test_list_event_summaries_uses_persisted_events() -> None:
 
 
 def test_get_event_detail_wraps_current_slice_collections() -> None:
-    service = EventService(InMemoryEventRepository([make_event()]))
+    repository = InMemoryEventRepository([make_event()])
+    service = EventService(repository, repository)
 
     response = service.get_event_detail("EVT-001")
 
@@ -30,6 +32,7 @@ def test_get_event_detail_wraps_current_slice_collections() -> None:
 
 
 def test_get_event_detail_returns_none_for_unknown_event() -> None:
-    service = EventService(InMemoryEventRepository([make_event()]))
+    repository = InMemoryEventRepository([make_event()])
+    service = EventService(repository, repository)
 
     assert service.get_event_detail("EVT-UNKNOWN") is None

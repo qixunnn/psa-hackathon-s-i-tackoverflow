@@ -26,7 +26,7 @@ def make_event() -> Event:
         lastUpdated=datetime(2026, 8, 23, 12, 0, tzinfo=timezone.utc),
         sourceIds=["SRC-001", "SRC-002"],
         evidenceIds=["EVD-001"],
-        developmentIds=["DEV-001", "DEV-002"],
+        developmentIds=[],
         routeExposure=RouteExposure(
             chokepointIds=["CHK-BAB"],
             affectedTradeCorridors=["Asia-Europe"],

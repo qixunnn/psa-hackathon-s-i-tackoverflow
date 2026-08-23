@@ -1,3 +1,7 @@
+delete from public.developments where event_id = 'EVT-001';
+delete from public.articles
+where id in ('ART-001', 'ART-002', 'ART-003', 'ART-004');
+
 insert into public.events (
     id,
     title,
@@ -36,7 +40,7 @@ values (
     '2026-08-23T12:00:00Z'::timestamptz,
     array['SRC-001', 'SRC-002'],
     array['EVD-001'],
-    array['DEV-001', 'DEV-002'],
+    array[]::text[],
     '{
         "chokepointIds": ["CHK-BAB"],
         "affectedTradeCorridors": ["Asia-Europe"],

@@ -173,9 +173,23 @@ To create and seed the current database slice, run these files in the Supabase
 SQL Editor in order:
 
 1. `backend/supabase/migrations/001_create_events.sql`
-2. `backend/supabase/seed.sql`
+2. `backend/supabase/migrations/002_create_articles_developments_and_replay.sql`
+3. `backend/supabase/seed.sql`
 
-The seed is idempotent and creates or refreshes synthetic event `EVT-001`.
+The seed resets the four demo replays and creates or refreshes synthetic event
+`EVT-001`.
+
+With the backend running, inspect and replay the deterministic demo sequence:
+
+```bash
+curl http://localhost:8000/api/v1/demo/articles
+curl -X POST http://localhost:8000/api/v1/demo/replay/red-sea-01
+curl http://localhost:8000/api/v1/events/EVT-001/developments
+```
+
+Replay `red-sea-01` a second time to verify the documented `409 Conflict`
+response. Continue with `red-sea-02`, `red-sea-03`, and `red-sea-04` to apply
+the complete synthetic confidence progression.
 
 The API is available at `http://127.0.0.1:8000`. Run the backend tests from
 the `backend` directory with:
