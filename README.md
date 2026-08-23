@@ -149,3 +149,24 @@ Documentation is written before implementation to support collaborative developm
 # Team
 
 This project is developed by Team Sitack Overflow for the PSA Hackathon.
+
+---
+
+# Run the Backend Locally
+
+From the repository root:
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+The API is available at `http://127.0.0.1:8000`. Run the backend tests from
+the `backend` directory with:
+
+```bash
+pytest
+```
