@@ -23,7 +23,7 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router)
 
-    # TODO: Add persistence and intelligence integrations in later vertical slices.
+    # TODO: Add intelligence integrations in later vertical slices.
     return app
 
 

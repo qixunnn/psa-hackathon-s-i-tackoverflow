@@ -1,4 +1,6 @@
-from fastapi import APIRouter
+from typing import Annotated
+
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from app.models.responses import (
@@ -7,7 +9,7 @@ from app.models.responses import (
     EventDetailResponse,
     EventListResponse,
 )
-from app.services.event_service import get_event_detail, list_event_summaries
+from app.services.event_service import EventService, get_event_service
 
 
 router = APIRouter(prefix="/events", tags=["events"])
@@ -18,8 +20,10 @@ router = APIRouter(prefix="/events", tags=["events"])
     response_model=EventListResponse,
     response_model_exclude_unset=True,
 )
-def list_events() -> EventListResponse:
-    return list_event_summaries()
+def list_events(
+    service: Annotated[EventService, Depends(get_event_service)],
+) -> EventListResponse:
+    return service.list_event_summaries()
 
 
 @router.get(
@@ -28,8 +32,11 @@ def list_events() -> EventListResponse:
     response_model_exclude_unset=True,
     responses={404: {"model": ErrorResponse}},
 )
-def get_event(eventId: str) -> EventDetailResponse | JSONResponse:
-    event_detail = get_event_detail(eventId)
+def get_event(
+    eventId: str,
+    service: Annotated[EventService, Depends(get_event_service)],
+) -> EventDetailResponse | JSONResponse:
+    event_detail = service.get_event_detail(eventId)
     if event_detail is not None:
         return event_detail
 

@@ -1,12 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.main import app
-
-
-client = TestClient(app)
-
-
-def test_health() -> None:
+def test_health(client: TestClient) -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
@@ -16,7 +10,7 @@ def test_health() -> None:
     }
 
 
-def test_list_events() -> None:
+def test_list_events(client: TestClient) -> None:
     response = client.get("/api/v1/events")
 
     assert response.status_code == 200
@@ -43,7 +37,7 @@ def test_list_events() -> None:
     ]
 
 
-def test_get_event_detail() -> None:
+def test_get_event_detail(client: TestClient) -> None:
     response = client.get("/api/v1/events/EVT-001")
 
     assert response.status_code == 200
@@ -61,7 +55,7 @@ def test_get_event_detail() -> None:
     assert body["recommendations"] == []
 
 
-def test_unknown_event_returns_404() -> None:
+def test_unknown_event_returns_404(client: TestClient) -> None:
     response = client.get("/api/v1/events/EVT-UNKNOWN")
 
     assert response.status_code == 404

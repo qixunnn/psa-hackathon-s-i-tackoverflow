@@ -161,8 +161,21 @@ cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+cp .env.example .env
 uvicorn app.main:app --reload
 ```
+
+Set `SUPABASE_URL` and the server-only `SUPABASE_SERVICE_ROLE_KEY` in
+`backend/.env` before starting the API. Never expose the service-role key to the
+frontend.
+
+To create and seed the current database slice, run these files in the Supabase
+SQL Editor in order:
+
+1. `backend/supabase/migrations/001_create_events.sql`
+2. `backend/supabase/seed.sql`
+
+The seed is idempotent and creates or refreshes synthetic event `EVT-001`.
 
 The API is available at `http://127.0.0.1:8000`. Run the backend tests from
 the `backend` directory with:
