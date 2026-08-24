@@ -165,16 +165,19 @@ cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-Set `SUPABASE_URL` and the server-only `SUPABASE_SERVICE_ROLE_KEY` in
-`backend/.env` before starting the API. Never expose the service-role key to the
-frontend.
+Set `SUPABASE_URL`, the server-only `SUPABASE_SERVICE_ROLE_KEY`, and
+`OPENAI_API_KEY` in `backend/.env` before using live article processing. The
+optional `OPENAI_MODEL`, `OPENAI_TIMEOUT_SECONDS`, and `EVENT_MATCH_THRESHOLD`
+settings have local defaults shown in `.env.example`. Never expose either
+server-side key to the frontend.
 
 To create and seed the current database slice, run these files in the Supabase
 SQL Editor in order:
 
 1. `backend/supabase/migrations/001_create_events.sql`
 2. `backend/supabase/migrations/002_create_articles_developments_and_replay.sql`
-3. `backend/supabase/seed.sql`
+3. `backend/supabase/migrations/003_create_global_watch_intelligence.sql`
+4. `backend/supabase/seed.sql`
 
 The seed resets the four demo replays and creates or refreshes synthetic event
 `EVT-001`.
@@ -190,6 +193,38 @@ curl http://localhost:8000/api/v1/events/EVT-001/developments
 Replay `red-sea-01` a second time to verify the documented `409 Conflict`
 response. Continue with `red-sea-02`, `red-sea-03`, and `red-sea-04` to apply
 the complete synthetic confidence progression.
+
+Process a live or manually supplied article through the Global Watch Agent:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/articles/process \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "title": "Carrier suspends Red Sea transit",
+    "content": "A shipping carrier announced temporary rerouting away from the Red Sea.",
+    "sourceName": "Example Carrier Bulletin",
+    "sourceType": "CARRIER_ADVISORY",
+    "url": null,
+    "publishedAt": "2026-08-24T08:00:00Z",
+    "isSynthetic": true
+  }'
+```
+
+Inspect the Global Watch processing trace with:
+
+```bash
+curl 'http://localhost:8000/api/v1/activity?agent=GLOBAL_WATCH'
+```
+
+The Global Watch MVP keeps final decisions deterministic:
+
+- an AI match suggestion is accepted only at or above
+  `EVENT_MATCH_THRESHOLD` and only when event type and normalized location match
+- initial confidence comes from a fixed source-type table; an update adds `0.14`
+  for a new independent source or `0.06` for a repeated source, capped at `0.95`
+- severity comes from a fixed event-type table and never decreases on an update
+
+These values are application rules, not model-generated confidence or severity.
 
 The API is available at `http://127.0.0.1:8000`. Run the backend tests from
 the `backend` directory with:

@@ -1,1 +1,0 @@
-"""Application-owned static datasets."""
