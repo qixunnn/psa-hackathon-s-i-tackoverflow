@@ -4,12 +4,12 @@
 
 :root {
   font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
-  color: #eef5f4;
-  background: #08191d;
+  color: #f2eee6;
+  background: #101318;
   font-synthesis: none;
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; background: #08191d; }
+body { margin: 0; min-width: 320px; background: #101318; }
 button, input, textarea { font: inherit; }
 button { cursor: pointer; }
