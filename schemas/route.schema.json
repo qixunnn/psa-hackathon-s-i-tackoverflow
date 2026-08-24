@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "route.schema.json",
+  "title": "Route",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "route_id": { "type": "string" },
+    "origin": { "type": "string" },
+    "destination": { "type": "string" },
+    "waypoints": { "type": "array", "items": { "type": "string" } },
+    "chokepoints": { "type": "array", "items": { "type": "string" } },
+    "distance_nm": { "type": "number" },
+    "base_transit_days": { "type": "number" }
+  },
+  "required": ["route_id", "origin", "destination", "waypoints", "chokepoints", "distance_nm", "base_transit_days"]
+}

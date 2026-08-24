@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RankedRoute",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "run_id": { "type": "string" },
+    "route_id": { "type": "string" },
+    "rank": { "type": "integer", "minimum": 1 },
+    "score": { "type": "number" },
+    "eta": { "type": "string", "format": "date-time" },
+    "eta_delta_days": { "type": "number" },
+    "rationale": { "type": "string" }
+  },
+  "required": ["run_id", "route_id", "rank", "score", "eta", "eta_delta_days", "rationale"]
+}

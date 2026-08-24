@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Vessel",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "vessel_name": { "type": "string" },
+    "scheduled_route_id": { "$ref": "route.schema.json#/properties/route_id" },
+    "scheduled_arrival": { "type": "string", "format": "date-time" }
+  },
+  "required": ["vessel_name", "scheduled_route_id", "scheduled_arrival"]
+}

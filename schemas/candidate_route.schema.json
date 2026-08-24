@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CandidateRoute",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "run_id": { "type": "string" },
+    "route_id": { "$ref": "route.schema.json#/properties/route_id" },
+    "retrieved_reason": { "type": "string" }
+  },
+  "required": ["run_id", "route_id", "retrieved_reason"]
+}

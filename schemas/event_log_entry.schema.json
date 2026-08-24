@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EventLogEntry",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "run_id": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "agent": { "type": "string" },
+    "message": { "type": "string" }
+  },
+  "required": ["run_id", "timestamp", "agent", "message"]
+}
