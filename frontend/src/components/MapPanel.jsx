@@ -38,10 +38,10 @@ export default function MapPanel({ run, routes=[], viewMode='2D' }) {
         const id = route.route_id
         map.addSource(id, { type:'geojson', data:routeFeature(route) })
         map.addLayer({ id:`${id}-glow`, type:'line', source:id, paint:{ 'line-color':ROUTE_COLORS[id], 'line-width':8, 'line-opacity':.15 } })
-        map.addLayer({ id, type:'line', source:id, paint:{ 'line-color':ROUTE_COLORS[id], 'line-width':id==='RT-002-FUJAIRAH-BYPASS'?3.5:2.2, 'line-opacity':id==='RT-003-ESCORTED-TRANSIT'?.3:.88, 'line-dasharray':id==='RT-003-ESCORTED-TRANSIT'?[2,2]:[1,0] } })
+        map.addLayer({ id, type:'line', source:id, paint:{ 'line-color':ROUTE_COLORS[id], 'line-width':id==='RT-001-BASELINE'?3.5:1.8, 'line-opacity':id==='RT-001-BASELINE'?.95:.32, 'line-dasharray':id==='RT-003-ESCORTED-TRANSIT'?[2,2]:[1,0] } })
       })
       map.addSource('hormuz-risk', { type:'geojson', data:{ type:'Feature', properties:{}, geometry:{ type:'Polygon', coordinates:[[[55.45,25.65],[56,27.15],[57,27.05],[57.2,25.65],[56.25,25.15],[55.45,25.65]]] } } })
-      map.addLayer({ id:'hormuz-risk-fill', type:'fill', source:'hormuz-risk', paint:{ 'fill-color':'#d86662', 'fill-opacity':.26, 'fill-outline-color':'#ef8a7f' } })
+      map.addLayer({ id:'hormuz-risk-fill', type:'fill', source:'hormuz-risk', paint:{ 'fill-color':'#d86662', 'fill-opacity':0, 'fill-outline-color':'#ef8a7f' } })
       makeMarker(map,[55.03,24.99],'JEBEL ALI','origin')
       makeMarker(map,[56.25,26.55],'STRAIT OF HORMUZ','risk')
       makeMarker(map,[99.65,5.55],'STRAIT OF MALACCA','chokepoint')
@@ -56,5 +56,23 @@ export default function MapPanel({ run, routes=[], viewMode='2D' }) {
     if (map?.isStyleLoaded()) map.easeTo({ pitch:viewMode==='3D'?45:0, bearing:viewMode==='3D'?-8:0, duration:700 })
   }, [viewMode])
 
-  return <section className="world-map" aria-label="Geographic map of the Jebel Ali to PSA Singapore corridor"><div ref={mapNode} className="maplibre-host"/><div className="map-vessel-card"><span>ACTIVE VESSEL</span><strong>MV Pacific Voyager</strong><small>Scheduled arrival · 04 Sep 2026</small></div><div className={`map-live-state ${affected.length?'alert':''}`}><span/> {affected.length?`${affected.join(', ')} RISK ACTIVE`:'MONITORING MVP CORRIDOR'}</div></section>
+  useEffect(() => {
+    const map = mapInstance.current
+    if (!map) return undefined
+    const applyRunState = () => {
+      if (map.getLayer('hormuz-risk-fill')) map.setPaintProperty('hormuz-risk-fill', 'fill-opacity', affected.length ? .26 : 0)
+      const ranked = new Map((run?.ranked_routes || []).map((route) => [route.route_id, route.rank]))
+      Object.keys(ROUTE_COORDINATES).forEach((id) => {
+        if (!map.getLayer(id)) return
+        const rank = ranked.get(id)
+        map.setPaintProperty(id, 'line-width', rank === 1 ? 4 : rank ? 2.5 : id === 'RT-001-BASELINE' ? 3.5 : 1.8)
+        map.setPaintProperty(id, 'line-opacity', rank === 1 ? 1 : rank ? .65 : id === 'RT-001-BASELINE' ? .95 : .32)
+      })
+    }
+    if (map.isStyleLoaded()) applyRunState()
+    else map.once('load', applyRunState)
+    return () => map.off('load', applyRunState)
+  }, [run, affected.length])
+
+  return <section className={`world-map ${affected.length ? 'risk-active' : ''}`} aria-label="Geographic map of the Jebel Ali to PSA Singapore corridor"><div ref={mapNode} className="maplibre-host"/><div className="map-vessel-card"><span>ACTIVE VESSEL</span><strong>MV Pacific Voyager</strong><small>Scheduled arrival · 04 Sep 2026</small></div><div className={`map-live-state ${affected.length?'alert':''}`}><span/> {affected.length?`${affected.join(', ')} RISK ACTIVE`:'MONITORING MVP CORRIDOR'}</div></section>
 }

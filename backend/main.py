@@ -96,6 +96,10 @@ def list_runs():
             "source_url": state["source_url"],
             "status": state["status"],
             "submitted_at": state["submitted_at"],
+            "relevant": state.get("event", {}).get("relevant"),
+            "severity": state.get("risk_assessment", {}).get("severity"),
+            "probability": state.get("risk_assessment", {}).get("probability"),
+            "operator_decision": state.get("advisory", {}).get("operator_decision"),
         })
     return runs
 

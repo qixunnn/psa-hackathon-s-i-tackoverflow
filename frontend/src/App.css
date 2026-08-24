@@ -45,6 +45,7 @@
 .intelligence-rail .route-panel th{padding:7px 9px;color:#698197;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font:600 6px 'JetBrains Mono',monospace;text-transform:uppercase}
 .intelligence-rail .route-panel td{padding:9px;color:#94a9bc;border-bottom:1px solid #5b80a419;font-size:7px;vertical-align:top}
 .intelligence-rail .route-panel td b{color:#d9e6f2}.intelligence-rail .route-panel .top-route{background:#29d98f12}.intelligence-rail .route-panel .delay{color:#ffb84d}
+.run-context-card{margin:12px;padding:13px;border:1px solid var(--line);border-radius:5px;background:var(--panel)}.run-context-card>strong{display:block;margin:9px 0 5px;color:var(--text);font-size:12px;text-transform:capitalize}.run-context-card>p{margin:8px 0;color:var(--muted);font-size:8px;line-height:1.55}.run-context-card>div{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;padding-top:9px;border-top:1px solid var(--line)}.run-context-card>div span{color:var(--muted);font-size:7px}.run-context-card>div b{overflow:hidden;color:#d9e2dc;font:500 7px 'JetBrains Mono',monospace;text-align:right;text-overflow:ellipsis;white-space:nowrap}.world-map:not(.risk-active) .geo-marker.risk{opacity:.38;filter:grayscale(.8)}
 
 /* Harbor Operations theme — warm, industrial and distinct from the reference UI */
 .command-shell{background:#101318;color:#f2eee6}
@@ -75,3 +76,4 @@
 
 .world-map .maplibregl-ctrl-group{background:#1b2026;border-color:#76664e55}.world-map .maplibregl-ctrl button{background-color:#1b2026}.map-vessel-card{border-color:#a9865245;background:#171c21ee}.map-vessel-card span{color:#e3a45b}.map-vessel-card small{color:#90968f}.geo-marker i{border-color:#d6fff6;background:#62c3b0;box-shadow:0 0 0 5px #62c3b02b,0 0 14px #62c3b0}.geo-marker span{color:#e5e0d6;background:#171c21ed;border-color:#6d9d9255}.geo-marker.risk i{background:#d86662;border-color:#ffdad5;box-shadow:0 0 0 8px #d8666235,0 0 16px #d86662}.geo-marker.risk span{color:#efa19a;border-color:#d8666280}.geo-marker.destination i{background:#e3a45b;border-color:#ffe7c5;box-shadow:0 0 0 5px #e3a45b33,0 0 14px #e3a45b}
 .intelligence-rail .route-panel th{color:#8e897f;border-color:#6f65562b}.intelligence-rail .route-panel td{color:#aaa69e;border-color:#74695a1c}.intelligence-rail .route-panel td b{color:#e3ddd3}.intelligence-rail .route-panel .top-route{background:#62c3b010}.intelligence-rail .route-panel .delay{color:#e3a45b}
+.run-context-card{background:#1a1f25;border-color:#6f65562e}.run-context-card>div{border-color:#6f65562b}.run-context-card>div b{color:#ded8cf}
