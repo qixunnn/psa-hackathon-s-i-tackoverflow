@@ -1,0 +1,56 @@
+[
+  {
+    "route_id": "RT-001-BASELINE",
+    "origin": "Jebel Ali",
+    "destination": "PSA Singapore",
+    "waypoints": [
+      "Jebel Ali",
+      "Strait of Hormuz",
+      "Arabian Sea",
+      "Strait of Malacca",
+      "PSA Singapore"
+    ],
+    "chokepoints": [
+      "Strait of Hormuz",
+      "Strait of Malacca"
+    ],
+    "distance_nm": 3900,
+    "base_transit_days": 11
+  },
+  {
+    "route_id": "RT-002-FUJAIRAH-BYPASS",
+    "origin": "Jebel Ali",
+    "destination": "PSA Singapore",
+    "waypoints": [
+      "Jebel Ali",
+      "Overland Transfer to Fujairah",
+      "Gulf of Oman",
+      "Arabian Sea",
+      "Strait of Malacca",
+      "PSA Singapore"
+    ],
+    "chokepoints": [
+      "Strait of Malacca"
+    ],
+    "distance_nm": 4100,
+    "base_transit_days": 13
+  },
+  {
+    "route_id": "RT-003-ESCORTED-TRANSIT",
+    "origin": "Jebel Ali",
+    "destination": "PSA Singapore",
+    "waypoints": [
+      "Jebel Ali",
+      "Strait of Hormuz (convoy/escort)",
+      "Arabian Sea",
+      "Strait of Malacca",
+      "PSA Singapore"
+    ],
+    "chokepoints": [
+      "Strait of Hormuz",
+      "Strait of Malacca"
+    ],
+    "distance_nm": 3900,
+    "base_transit_days": 14
+  }
+]
