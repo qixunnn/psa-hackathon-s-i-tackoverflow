@@ -1,0 +1,5 @@
+export default function RouteComparisonPanel({ run, routes = [] }) {
+  const routeMap = new Map(routes.map((route) => [route.route_id, route]))
+  const rows = (run?.ranked_routes || []).map((ranked) => ({ ...ranked, ...routeMap.get(ranked.route_id) }))
+  return <section className="panel route-panel"><div className="section-heading"><div><span className="eyebrow">Route graph</span><h2>Route comparison</h2></div><span className="count-badge">{rows.length} options</span></div>{rows.length === 0 ? <p className="empty-state">Ranked routes will appear here.</p> : <div className="table-wrap"><table><thead><tr><th>Route</th><th>Distance (nm)</th><th>Transit Days</th><th>ETA</th><th>Δ vs scheduled</th><th>Chokepoints</th></tr></thead><tbody>{rows.map((row) => <tr className={row.rank === 1 ? 'top-route' : ''} key={row.route_id}><td><b>#{row.rank} {row.route_id}</b></td><td>{row.distance_nm}</td><td>{row.base_transit_days}</td><td>{new Date(row.eta).toLocaleDateString()}</td><td className={row.eta_delta_days > 0 ? 'delay' : ''}>{row.eta_delta_days > 0 ? '+' : ''}{row.eta_delta_days}d</td><td>{row.chokepoints?.join(', ')}</td></tr>)}</tbody></table></div>}</section>
+}
