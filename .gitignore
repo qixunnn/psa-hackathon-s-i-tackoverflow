@@ -5,3 +5,14 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+
+# Frontend dependencies and builds
+frontend/node_modules/
+frontend/dist/
+frontend/.next/
+frontend/coverage/
+*.log
+
+# Backend-generated runtime data
+backend/storage/runs/
+backend/storage/events/
