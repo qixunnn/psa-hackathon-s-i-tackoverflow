@@ -36,6 +36,11 @@ app.add_middleware(
 class RunRequest(BaseModel):
     source_url: str
     note: str | None = None
+    article_text: str | None = None
+
+
+class ManualArticleTextRequest(BaseModel):
+    article_text: str
 
 
 class DecisionRequest(BaseModel):
@@ -67,8 +72,39 @@ def create_run(request: RunRequest, background_tasks: BackgroundTasks):
     validate("run", state)
     RUNS_DIRECTORY.mkdir(parents=True, exist_ok=True)
     persist_run(state)
-    background_tasks.add_task(run_pipeline, run_id, request.source_url, request.note)
+    background_tasks.add_task(
+        run_pipeline,
+        run_id,
+        request.source_url,
+        request.note,
+        request.article_text,
+    )
     return {"run_id": run_id}
+
+
+@app.post("/runs/{run_id}/article-text", status_code=202)
+def resume_run_with_article_text(
+    run_id: str,
+    request: ManualArticleTextRequest,
+    background_tasks: BackgroundTasks,
+):
+    run_path = RUNS_DIRECTORY / f"{run_id}.json"
+    state = _read_json(run_path)
+    if state["status"] != "awaiting_manual_text":
+        raise HTTPException(status_code=409, detail="Run is not awaiting manual article text")
+    article_text = request.article_text.strip()
+    if not article_text:
+        raise HTTPException(status_code=422, detail="article_text must not be empty")
+    state["status"] = "queued"
+    persist_run(state)
+    background_tasks.add_task(
+        run_pipeline,
+        run_id,
+        state["source_url"],
+        None,
+        article_text,
+    )
+    return {"run_id": run_id, "status": "queued"}
 
 
 @app.get("/runs/{run_id}")

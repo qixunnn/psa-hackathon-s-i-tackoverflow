@@ -7,7 +7,7 @@
     "run_id": { "type": "string" },
     "status": {
       "type": "string",
-      "enum": ["queued", "extracting", "assessing_risk", "retrieving_routes", "ranking", "advising", "complete", "halted_not_relevant", "error"]
+      "enum": ["queued", "extracting", "awaiting_manual_text", "assessing_risk", "retrieving_routes", "ranking", "advising", "complete", "halted_not_relevant", "error"]
     },
     "submitted_by": { "type": "string" },
     "submitted_at": { "type": "string", "format": "date-time" },

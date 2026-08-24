@@ -11,6 +11,7 @@ from backend.agents import (
     agent4_ranking,
     agent5_advisory,
 )
+from backend.agents.agent1_relevance import Agent1Error, ArticleExtractionError
 from backend.orchestrator.schema_validation import ValidationError, validate
 
 
@@ -69,6 +70,12 @@ def _validation_failure(state: dict, error: ValidationError) -> None:
     append_event(state["run_id"], "orchestrator", f"Schema validation failed: {error}")
 
 
+def _agent_failure(state: dict, error: Agent1Error) -> None:
+    state["status"] = "error"
+    persist_run(state)
+    append_event(state["run_id"], "agent_1_relevance", f"Agent 1 failed: {error}")
+
+
 def _run_agent(state: dict, status: str, agent_name: str, schema_name: str, agent_callable):
     _set_status(state, status)
     output = agent_callable(state)
@@ -80,21 +87,37 @@ def _run_agent(state: dict, status: str, agent_name: str, schema_name: str, agen
     return output
 
 
-def run_pipeline(run_id: str, source_url: str, note: str | None) -> None:
-    """Run all stubbed agents synchronously and persist each transition."""
+def run_pipeline(
+    run_id: str,
+    source_url: str,
+    note: str | None,
+    article_text: str | None = None,
+) -> None:
+    """Run the sequential pipeline and persist each transition."""
     del note
-    state = {
-        "run_id": run_id,
-        "status": "queued",
-        "submitted_by": "operator",
-        "submitted_at": _timestamp(),
-        "source_url": source_url,
-    }
+    run_path = _run_path(run_id)
+    if run_path.is_file():
+        with run_path.open(encoding="utf-8") as run_file:
+            state = json.load(run_file)
+        state["status"] = "queued"
+    else:
+        state = {
+            "run_id": run_id,
+            "status": "queued",
+            "submitted_by": "operator",
+            "submitted_at": _timestamp(),
+            "source_url": source_url,
+        }
     validate("run", state)
     persist_run(state)
 
     try:
-        event = _run_agent(state, "extracting", "agent_1_relevance", "event", agent1_relevance.run)
+        _set_status(state, "extracting")
+        agent_input = dict(state)
+        if article_text and article_text.strip():
+            agent_input["article_text"] = article_text
+        event = agent1_relevance.run(agent_input)
+        validate("event", event)
         state["event"] = event
         if not event["relevant"]:
             state["status"] = "halted_not_relevant"
@@ -134,5 +157,11 @@ def run_pipeline(run_id: str, source_url: str, note: str | None) -> None:
         state["status"] = "complete"
         persist_run(state)
         append_event(run_id, "agent_5_advisory", "Advisory generated; operator decision pending.")
+    except ArticleExtractionError as error:
+        state["status"] = "awaiting_manual_text"
+        persist_run(state)
+        append_event(run_id, "agent_1_relevance", f"Article text required: {error}")
     except ValidationError as error:
         _validation_failure(state, error)
+    except Agent1Error as error:
+        _agent_failure(state, error)

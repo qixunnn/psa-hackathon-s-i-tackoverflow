@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend import main
-from backend.agents import agent2_risk
+from backend.agents import agent1_relevance, agent2_risk
 from backend.orchestrator import state_machine
 from backend.orchestrator.schema_validation import validate
 
@@ -18,6 +18,28 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(state_machine, "EVENTS_DIRECTORY", events_directory)
     monkeypatch.setattr(main, "RUNS_DIRECTORY", runs_directory)
     monkeypatch.setattr(main, "EVENTS_DIRECTORY", events_directory)
+
+    def canned_agent1(state):
+        relevant = "irrelevant" not in state["source_url"]
+        return {
+            "run_id": state["run_id"],
+            "relevant": relevant,
+            "confidence": 0.9,
+            "relevance_rationale": "The submitted article was assessed against PSA-bound shipping.",
+            "summary": "A validated test article.",
+            "entities": {
+                "location": "Strait of Hormuz" if relevant else "Domestic market",
+                "event_type": "geopolitical tension" if relevant else "labor dispute",
+                "date": "2026-08-25",
+                "actors": ["Shipping operators"] if relevant else ["Domestic workers"],
+                "chokepoints_mentioned": ["Strait of Hormuz"] if relevant else [],
+            },
+            "evidence": ["A concise source-backed test excerpt."],
+            "source_url": state["source_url"],
+            "extracted_at": "2026-08-25T00:00:00Z",
+        }
+
+    monkeypatch.setattr(agent1_relevance, "run", canned_agent1)
     return TestClient(main.app)
 
 
@@ -133,3 +155,70 @@ def test_complete_event_log_has_five_ordered_agent_entries(client):
         "agent_5_advisory",
     ]
     assert all(event["timestamp"] and event["message"] for event in events)
+
+
+def test_scraping_failure_is_recoverable_manual_text_state(client, monkeypatch):
+    def scraping_failure(_state):
+        raise agent1_relevance.ArticleExtractionError("No readable article text")
+
+    monkeypatch.setattr(agent1_relevance, "run", scraping_failure)
+    response = client.post("/runs", json={"source_url": "https://example.com/paywall"})
+    state = wait_for_run(client, response.json()["run_id"])
+
+    assert state["status"] == "awaiting_manual_text"
+    assert state["status"] != "error"
+    assert "event" not in state
+
+
+def test_manual_article_text_resumes_same_run(client, monkeypatch):
+    received_text = []
+
+    def resumable_agent(state):
+        received_text.append(state.get("article_text"))
+        if not state.get("article_text"):
+            raise agent1_relevance.ArticleExtractionError("Manual text required")
+        return {
+            "run_id": state["run_id"],
+            "relevant": False,
+            "confidence": 0.94,
+            "relevance_rationale": "The article has no maritime or PSA-bound shipping impact.",
+            "summary": "The article concerns a domestic retail event.",
+            "entities": {
+                "location": "Singapore",
+                "event_type": "retail event",
+                "date": "2026-08-25",
+                "actors": ["Retailers"],
+                "chokepoints_mentioned": [],
+            },
+            "evidence": ["Retail sales increased during the holiday period."],
+            "source_url": state["source_url"],
+            "extracted_at": "2026-08-25T00:00:00Z",
+        }
+
+    monkeypatch.setattr(agent1_relevance, "run", resumable_agent)
+    created = client.post("/runs", json={"source_url": "https://example.com/paywall"})
+    run_id = created.json()["run_id"]
+    assert wait_for_run(client, run_id)["status"] == "awaiting_manual_text"
+
+    resumed = client.post(
+        f"/runs/{run_id}/article-text",
+        json={"article_text": "Retail sales increased during the holiday period."},
+    )
+
+    assert resumed.status_code == 202
+    state = wait_for_run(client, run_id)
+    assert state["status"] == "halted_not_relevant"
+    assert state["event"]["relevant"] is False
+    assert received_text == [None, "Retail sales increased during the holiday period."]
+
+
+def test_malformed_gemini_output_sets_pipeline_error(client, monkeypatch):
+    def malformed_response(_state):
+        raise agent1_relevance.GeminiResponseError("Gemini returned malformed JSON")
+
+    monkeypatch.setattr(agent1_relevance, "run", malformed_response)
+    response = client.post("/runs", json={"source_url": "https://example.com/malformed"})
+    state = wait_for_run(client, response.json()["run_id"])
+
+    assert state["status"] == "error"
+    assert "risk_assessment" not in state

@@ -15,6 +15,7 @@ VALID_PAYLOADS = {
         "run_id": "run-1",
         "relevant": True,
         "confidence": 0.8,
+        "relevance_rationale": "The article describes disruption at a shipping chokepoint.",
         "summary": "A shipping disruption was reported.",
         "entities": {
             "location": "Strait of Hormuz",
@@ -23,6 +24,7 @@ VALID_PAYLOADS = {
             "actors": ["Carrier"],
             "chokepoints_mentioned": ["Strait of Hormuz"],
         },
+        "evidence": ["Transit through the strait was temporarily suspended."],
         "source_url": "https://example.com/article",
         "extracted_at": "2026-08-25T10:01:00Z",
     },
@@ -95,3 +97,17 @@ def test_valid_payloads(entity_name):
 def test_invalid_payloads_raise(entity_name):
     with pytest.raises(ValidationError):
         validate(entity_name, INVALID_PAYLOADS[entity_name])
+
+
+def test_event_rejects_missing_relevance_rationale():
+    payload = dict(VALID_PAYLOADS["event"])
+    payload.pop("relevance_rationale")
+    with pytest.raises(ValidationError):
+        validate("event", payload)
+
+
+@pytest.mark.parametrize("evidence", ["not-a-list", [], [""], [42]])
+def test_event_rejects_invalid_evidence(evidence):
+    payload = {**VALID_PAYLOADS["event"], "evidence": evidence}
+    with pytest.raises(ValidationError):
+        validate("event", payload)
