@@ -1,0 +1,81 @@
+{
+  "run_id": "0cc37aae-101b-47ad-b106-7fcda7283535",
+  "status": "complete",
+  "submitted_by": "operator",
+  "submitted_at": "2026-08-24T16:56:43.396629Z",
+  "source_url": "https://www.reuters.com/world/middle-east/iran-warns-vessels-violating-hormuz-transit-rules-fines-detention-2026-08-24/",
+  "event": {
+    "run_id": "0cc37aae-101b-47ad-b106-7fcda7283535",
+    "relevant": true,
+    "confidence": 0.91,
+    "summary": "Strait of Hormuz tension may disrupt maritime transit to PSA Singapore.",
+    "entities": {
+      "location": "Strait of Hormuz",
+      "event_type": "geopolitical tension",
+      "date": "2026-08-25",
+      "actors": [
+        "Regional authorities",
+        "Shipping operators"
+      ],
+      "chokepoints_mentioned": [
+        "Strait of Hormuz"
+      ]
+    },
+    "source_url": "https://www.reuters.com/world/middle-east/iran-warns-vessels-violating-hormuz-transit-rules-fines-detention-2026-08-24/",
+    "extracted_at": "2026-08-25T00:00:00Z"
+  },
+  "risk_assessment": {
+    "run_id": "0cc37aae-101b-47ad-b106-7fcda7283535",
+    "severity": "High",
+    "probability": 0.7,
+    "affected_chokepoints": [
+      "Strait of Hormuz"
+    ],
+    "estimated_duration": "3-5 days",
+    "rationale": "Tension at the Strait of Hormuz creates a material risk of transit delay."
+  },
+  "candidate_routes": [
+    {
+      "run_id": "0cc37aae-101b-47ad-b106-7fcda7283535",
+      "route_id": "RT-001-BASELINE",
+      "retrieved_reason": "Baseline route retained for comparison."
+    },
+    {
+      "run_id": "0cc37aae-101b-47ad-b106-7fcda7283535",
+      "route_id": "RT-002-FUJAIRAH-BYPASS",
+      "retrieved_reason": "Avoids affected chokepoints."
+    }
+  ],
+  "ranked_routes": [
+    {
+      "run_id": "0cc37aae-101b-47ad-b106-7fcda7283535",
+      "route_id": "RT-002-FUJAIRAH-BYPASS",
+      "rank": 1,
+      "score": 0.88,
+      "eta": "2026-09-06T16:26:26.878600Z",
+      "eta_delta_days": 2,
+      "rationale": "Balances chokepoint exposure and transit time."
+    },
+    {
+      "run_id": "0cc37aae-101b-47ad-b106-7fcda7283535",
+      "route_id": "RT-001-BASELINE",
+      "rank": 2,
+      "score": 0.65,
+      "eta": "2026-09-04T16:26:26.878600Z",
+      "eta_delta_days": 0,
+      "rationale": "Balances chokepoint exposure and transit time."
+    }
+  ],
+  "advisory": {
+    "run_id": "0cc37aae-101b-47ad-b106-7fcda7283535",
+    "headline": "Prepare for possible Strait of Hormuz delay",
+    "summary": "Strait of Hormuz tension may delay the vessel by several days.",
+    "recommended_actions": [
+      "Flag berth slot for possible delay",
+      "Notify transshipment partners"
+    ],
+    "confidence": 0.85,
+    "operator_decision": "pending",
+    "operator_comment": null
+  }
+}

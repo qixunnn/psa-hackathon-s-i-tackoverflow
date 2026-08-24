@@ -1,0 +1,8 @@
+[
+  {
+    "run_id": "e75ca0a2-99f7-4393-8dde-286fa9fa7e85",
+    "timestamp": "2026-08-24T18:55:01.043657Z",
+    "agent": "agent_1_relevance",
+    "message": "Agent 1 failed: Gemini request failed: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use models/gemini-3.6-flash for the latest features and improvements.', 'status': 'NOT_FOUND'}}"
+  }
+]

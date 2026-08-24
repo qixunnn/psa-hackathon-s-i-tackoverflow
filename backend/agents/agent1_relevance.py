@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+import re
 from typing import Any, Callable
 
-from google import genai
 import trafilatura
 
-from backend.config import ConfigurationError, GeminiSettings
+from backend.config import ConfigurationError, GeminiSettings, create_gemini_client
+from backend.chokepoints import UnknownChokepointError, normalize_chokepoints
 from backend.orchestrator.schema_validation import validate
 from backend.prompts.agent1 import SYSTEM_INSTRUCTION, build_prompt
 
@@ -58,11 +59,21 @@ def _gemini_response_schema() -> dict[str, Any]:
     }
 
 
-def _fetch_article_text(
+def _publication_date(downloaded: Any, source_url: str, metadata_extractor: Callable[..., Any]) -> str | None:
+    try:
+        metadata = metadata_extractor(downloaded, default_url=source_url)
+    except Exception:
+        return None
+    value = getattr(metadata, "date", None)
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _fetch_article_content(
     source_url: str,
     fetcher: Callable[[str], Any],
     extractor: Callable[..., str | None],
-) -> str:
+    metadata_extractor: Callable[..., Any],
+) -> tuple[str, str | None]:
     try:
         downloaded = fetcher(source_url)
         if not downloaded:
@@ -74,11 +85,39 @@ def _fetch_article_text(
         raise ArticleExtractionError(f"Article fetch/extraction failed: {error}") from error
     if not extracted or not extracted.strip():
         raise ArticleExtractionError("Article extraction returned no readable text")
-    return extracted.strip()
+    return extracted.strip(), _publication_date(downloaded, source_url, metadata_extractor)
 
 
-def _create_client(settings: GeminiSettings):
-    return genai.Client(api_key=settings.api_key)
+def _parse_publication_date(value: str | None):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+    except ValueError:
+        return None
+
+
+def _normalize_event_date(value: str, publication_date: str | None) -> str:
+    """Resolve month/day dates only when trustworthy publication context exists."""
+    published = _parse_publication_date(publication_date)
+    if published is None:
+        return value
+
+    cleaned = re.sub(r",", "", value.strip())
+    for date_format in ("%b %d", "%B %d"):
+        try:
+            partial = datetime.strptime(f"{cleaned} 2000", f"{date_format} %Y").date()
+            return partial.replace(year=published.year).isoformat()
+        except ValueError:
+            pass
+
+    try:
+        parsed = datetime.strptime(cleaned, "%Y-%m-%d").date()
+    except ValueError:
+        return value
+    if (parsed.month, parsed.day) == (published.month, published.day):
+        return parsed.replace(year=published.year).isoformat()
+    return parsed.isoformat()
 
 
 def run(
@@ -86,6 +125,7 @@ def run(
     *,
     fetcher: Callable[[str], Any] = trafilatura.fetch_url,
     extractor: Callable[..., str | None] = trafilatura.extract,
+    metadata_extractor: Callable[..., Any] = trafilatura.extract_metadata,
     client=None,
     settings: GeminiSettings | None = None,
 ) -> dict:
@@ -93,15 +133,18 @@ def run(
     source_url = state["source_url"]
     manual_text = state.get("article_text")
     article_text = manual_text.strip() if isinstance(manual_text, str) else ""
+    publication_date = None
     if not article_text:
-        article_text = _fetch_article_text(source_url, fetcher, extractor)
+        article_text, publication_date = _fetch_article_content(
+            source_url, fetcher, extractor, metadata_extractor
+        )
 
     try:
         resolved_settings = settings or GeminiSettings.from_env()
-        gemini_client = client or _create_client(resolved_settings)
+        gemini_client = client or create_gemini_client(resolved_settings)
         response = gemini_client.models.generate_content(
             model=resolved_settings.model,
-            contents=build_prompt(source_url, article_text),
+            contents=build_prompt(source_url, article_text, publication_date),
             config={
                 "system_instruction": SYSTEM_INSTRUCTION,
                 "response_mime_type": "application/json",
@@ -127,5 +170,15 @@ def run(
         "source_url": source_url,
         "extracted_at": _now(),
     }
+    validate("event", event)
+    try:
+        event["entities"]["chokepoints_mentioned"] = normalize_chokepoints(
+            event["entities"]["chokepoints_mentioned"]
+        )
+    except UnknownChokepointError as error:
+        raise GeminiResponseError(str(error)) from error
+    event["entities"]["date"] = _normalize_event_date(
+        event["entities"]["date"], publication_date
+    )
     validate("event", event)
     return event

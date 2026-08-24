@@ -178,3 +178,111 @@ def test_gemini_api_error_is_explicit_and_wrapped():
         agent1_relevance.run(
             state(article_text=ARTICLE_TEXT), client=client, settings=SETTINGS
         )
+
+
+@pytest.mark.parametrize("generated_date", ["Aug 11", "2025-08-11"])
+def test_month_day_event_date_resolves_against_article_publication_metadata(generated_date):
+    payload = valid_gemini_payload()
+    payload["entities"]["date"] = generated_date
+    client, _ = fake_client(payload)
+
+    event = agent1_relevance.run(
+        state(),
+        fetcher=lambda _url: "<html>article</html>",
+        extractor=lambda _html, **_options: ARTICLE_TEXT,
+        metadata_extractor=lambda _html, **_options: SimpleNamespace(date="2026-08-11"),
+        client=client,
+        settings=SETTINGS,
+    )
+
+    assert event["entities"]["date"] == "2026-08-11"
+
+
+def test_incomplete_event_date_does_not_guess_year_without_metadata():
+    payload = valid_gemini_payload()
+    payload["entities"]["date"] = "Aug 11"
+    client, _ = fake_client(payload)
+
+    event = agent1_relevance.run(
+        state(article_text=ARTICLE_TEXT), client=client, settings=SETTINGS
+    )
+
+    assert event["entities"]["date"] == "Aug 11"
+
+
+@pytest.mark.parametrize("chokepoint", ["Strait of Hormuz", "Bab el-Mandeb"])
+def test_known_chokepoints_are_accepted(chokepoint):
+    payload = valid_gemini_payload()
+    payload["entities"]["chokepoints_mentioned"] = [chokepoint]
+    client, _ = fake_client(payload)
+
+    event = agent1_relevance.run(
+        state(article_text=ARTICLE_TEXT), client=client, settings=SETTINGS
+    )
+
+    assert event["entities"]["chokepoints_mentioned"] == [chokepoint]
+
+
+def test_maritime_regions_are_removed_from_chokepoints_without_losing_event_context():
+    payload = valid_gemini_payload()
+    payload["summary"] = "Attacks affected the Red Sea and Gulf of Oman near two chokepoints."
+    payload["entities"]["chokepoints_mentioned"] = [
+        "Strait of Hormuz",
+        "Red Sea",
+        "Bab el-Mandeb",
+        "Gulf of Oman",
+    ]
+    client, _ = fake_client(payload)
+
+    event = agent1_relevance.run(
+        state(article_text=ARTICLE_TEXT), client=client, settings=SETTINGS
+    )
+
+    assert event["entities"]["chokepoints_mentioned"] == [
+        "Strait of Hormuz",
+        "Bab el-Mandeb",
+    ]
+    assert "Red Sea" in event["summary"]
+    assert "Gulf of Oman" in event["summary"]
+
+
+def test_chokepoint_alias_normalization_is_deterministic():
+    payload = valid_gemini_payload()
+    payload["entities"]["chokepoints_mentioned"] = ["hormuz strait", "Bab al-Mandab"]
+    client, _ = fake_client(payload)
+
+    event = agent1_relevance.run(
+        state(article_text=ARTICLE_TEXT), client=client, settings=SETTINGS
+    )
+
+    assert event["entities"]["chokepoints_mentioned"] == [
+        "Strait of Hormuz",
+        "Bab el-Mandeb",
+    ]
+
+
+@pytest.mark.parametrize(
+    "alias",
+    ["Bab el-Mandeb strait", "Strait of Bab el-Mandeb"],
+)
+def test_bab_el_mandeb_strait_aliases_are_canonicalized(alias):
+    payload = valid_gemini_payload()
+    payload["entities"]["chokepoints_mentioned"] = [alias]
+    client, _ = fake_client(payload)
+
+    event = agent1_relevance.run(
+        state(article_text=ARTICLE_TEXT), client=client, settings=SETTINGS
+    )
+
+    assert event["entities"]["chokepoints_mentioned"] == ["Bab el-Mandeb"]
+
+
+def test_unrecognized_chokepoint_is_rejected_explicitly():
+    payload = valid_gemini_payload()
+    payload["entities"]["chokepoints_mentioned"] = ["Imaginary Passage"]
+    client, _ = fake_client(payload)
+
+    with pytest.raises(agent1_relevance.GeminiResponseError, match="Unrecognized chokepoint"):
+        agent1_relevance.run(
+            state(article_text=ARTICLE_TEXT), client=client, settings=SETTINGS
+        )

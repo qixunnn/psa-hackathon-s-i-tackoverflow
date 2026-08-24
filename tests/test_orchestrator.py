@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend import main
-from backend.agents import agent1_relevance, agent2_risk
+from backend.agents import agent1_relevance, agent2_risk, agent3_route_retrieval
 from backend.orchestrator import state_machine
 from backend.orchestrator.schema_validation import validate
 
@@ -39,7 +39,20 @@ def client(tmp_path, monkeypatch):
             "extracted_at": "2026-08-25T00:00:00Z",
         }
 
+    def canned_agent2(event):
+        return {
+            "run_id": event["run_id"],
+            "severity": "High",
+            "confidence": 0.88,
+            "probability": 0.7,
+            "affected_chokepoints": ["Strait of Hormuz"],
+            "estimated_duration": "3-5 days",
+            "rationale": "The disruption affects a major shipping chokepoint.",
+            "evidence": [event["evidence"][0]],
+        }
+
     monkeypatch.setattr(agent1_relevance, "run", canned_agent1)
+    monkeypatch.setattr(agent2_risk, "run", canned_agent2)
     return TestClient(main.app)
 
 
@@ -88,8 +101,93 @@ def test_invalid_risk_output_stops_pipeline(client, monkeypatch):
     state = wait_for_run(client, response.json()["run_id"])
 
     assert state["status"] == "error"
+    assert "risk_assessment" not in state
     assert "candidate_routes" not in state
     assert "ranked_routes" not in state
+
+
+def test_successful_agent2_transitions_to_retrieving_routes(client, monkeypatch):
+    observed_statuses = []
+    original_agent3 = state_machine.agent3_route_retrieval.run
+
+    def observing_agent3(state):
+        observed_statuses.append(state["status"])
+        return original_agent3(state)
+
+    monkeypatch.setattr(state_machine.agent3_route_retrieval, "run", observing_agent3)
+    response = client.post("/runs", json={"source_url": "https://example.com/hormuz"})
+    state = wait_for_run(client, response.json()["run_id"])
+
+    assert state["status"] == "complete"
+    assert observed_statuses == ["retrieving_routes"]
+
+
+def test_agent3_attaches_validated_candidates_before_ranking(client, monkeypatch):
+    observed_states = []
+    original_agent4 = state_machine.agent4_ranking.run
+
+    def observing_agent4(state):
+        validate("run", state)
+        observed_states.append(
+            {
+                "status": state["status"],
+                "candidate_routes": list(state["candidate_routes"]),
+            }
+        )
+        return original_agent4(state)
+
+    monkeypatch.setattr(state_machine.agent4_ranking, "run", observing_agent4)
+    response = client.post("/runs", json={"source_url": "https://example.com/hormuz"})
+    state = wait_for_run(client, response.json()["run_id"])
+
+    assert state["status"] == "complete"
+    assert observed_states[0]["status"] == "ranking"
+    assert observed_states[0]["candidate_routes"]
+
+
+def test_agent3_failure_sets_error_and_does_not_rank(client, monkeypatch):
+    def invalid_agent3_input(_state):
+        raise agent3_route_retrieval.Agent3Error("Unrecognized chokepoint: Unknown Strait")
+
+    monkeypatch.setattr(agent3_route_retrieval, "run", invalid_agent3_input)
+    response = client.post("/runs", json={"source_url": "https://example.com/hormuz"})
+    run_id = response.json()["run_id"]
+    state = wait_for_run(client, run_id)
+
+    assert state["status"] == "error"
+    assert "candidate_routes" not in state
+    assert "ranked_routes" not in state
+    events = json.loads((main.EVENTS_DIRECTORY / f"{run_id}.json").read_text(encoding="utf-8"))
+    assert events[-1]["agent"] == "agent_3_route_retrieval"
+
+
+def test_unsupported_valid_chokepoint_is_recorded_in_agent3_event(client, monkeypatch):
+    def mixed_coverage_risk(event):
+        risk = {
+            "run_id": event["run_id"],
+            "severity": "High",
+            "confidence": 0.88,
+            "probability": 0.7,
+            "affected_chokepoints": ["Bab el-Mandeb", "Strait of Hormuz"],
+            "estimated_duration": "3-5 days",
+            "rationale": "Two recognized chokepoints may be affected.",
+            "evidence": [event["evidence"][0]],
+        }
+        return risk
+
+    monkeypatch.setattr(agent2_risk, "run", mixed_coverage_risk)
+    response = client.post("/runs", json={"source_url": "https://example.com/hormuz"})
+    run_id = response.json()["run_id"]
+    state = wait_for_run(client, run_id)
+    events = json.loads((main.EVENTS_DIRECTORY / f"{run_id}.json").read_text(encoding="utf-8"))
+
+    assert state["status"] == "complete"
+    assert [item["route_id"] for item in state["candidate_routes"]] == [
+        "RT-001-BASELINE",
+        "RT-002-FUJAIRAH-BYPASS",
+    ]
+    agent3_event = next(item for item in events if item["agent"] == "agent_3_route_retrieval")
+    assert "unsupported by the MVP graph: Bab el-Mandeb" in agent3_event["message"]
 
 
 def test_run_and_event_files_are_valid_json(client):

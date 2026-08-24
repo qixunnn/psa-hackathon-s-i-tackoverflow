@@ -1,0 +1,32 @@
+[
+  {
+    "run_id": "bc5d6ecb-98cf-4ad9-94d2-084f873d27f9",
+    "timestamp": "2026-08-24T17:07:14.400261Z",
+    "agent": "agent_1_relevance",
+    "message": "Article extracted and confirmed relevant."
+  },
+  {
+    "run_id": "bc5d6ecb-98cf-4ad9-94d2-084f873d27f9",
+    "timestamp": "2026-08-24T17:07:15.408588Z",
+    "agent": "agent_2_risk",
+    "message": "Risk assessment completed."
+  },
+  {
+    "run_id": "bc5d6ecb-98cf-4ad9-94d2-084f873d27f9",
+    "timestamp": "2026-08-24T17:07:16.420631Z",
+    "agent": "agent_3_route_retrieval",
+    "message": "Candidate routes retrieved from route graph."
+  },
+  {
+    "run_id": "bc5d6ecb-98cf-4ad9-94d2-084f873d27f9",
+    "timestamp": "2026-08-24T17:07:17.426891Z",
+    "agent": "agent_4_ranking",
+    "message": "Candidate routes ranked with ETA impact."
+  },
+  {
+    "run_id": "bc5d6ecb-98cf-4ad9-94d2-084f873d27f9",
+    "timestamp": "2026-08-24T17:07:18.433980Z",
+    "agent": "agent_5_advisory",
+    "message": "Advisory generated; operator decision pending."
+  }
+]

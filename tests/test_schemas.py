@@ -31,10 +31,12 @@ VALID_PAYLOADS = {
     "risk_assessment": {
         "run_id": "run-1",
         "severity": "High",
+        "confidence": 0.86,
         "probability": 0.7,
         "affected_chokepoints": ["Strait of Hormuz"],
         "estimated_duration": "3-5 days",
         "rationale": "The disruption affects a major shipping chokepoint.",
+        "evidence": ["Transit through the strait was temporarily suspended."],
     },
     "route": {
         "route_id": "route-1",
@@ -111,3 +113,62 @@ def test_event_rejects_invalid_evidence(evidence):
     payload = {**VALID_PAYLOADS["event"], "evidence": evidence}
     with pytest.raises(ValidationError):
         validate("event", payload)
+
+
+def test_run_accepts_event_only_intermediate_state():
+    payload = {**VALID_PAYLOADS["run"], "event": VALID_PAYLOADS["event"]}
+    validate("run", payload)
+
+
+def test_run_accepts_event_and_risk_assessment():
+    payload = {
+        **VALID_PAYLOADS["run"],
+        "event": VALID_PAYLOADS["event"],
+        "risk_assessment": VALID_PAYLOADS["risk_assessment"],
+    }
+    validate("run", payload)
+
+
+def test_run_accepts_validated_candidate_routes():
+    payload = {
+        **VALID_PAYLOADS["run"],
+        "event": VALID_PAYLOADS["event"],
+        "risk_assessment": VALID_PAYLOADS["risk_assessment"],
+        "candidate_routes": [VALID_PAYLOADS["candidate_route"]],
+        "status": "ranking",
+    }
+    validate("run", payload)
+
+
+def test_run_rejects_malformed_candidate_route():
+    payload = {
+        **VALID_PAYLOADS["run"],
+        "candidate_routes": [{"run_id": "run-1"}],
+    }
+    with pytest.raises(ValidationError):
+        validate("run", payload)
+
+
+def test_risk_assessment_requires_confidence():
+    payload = dict(VALID_PAYLOADS["risk_assessment"])
+    payload.pop("confidence")
+    with pytest.raises(ValidationError):
+        validate("risk_assessment", payload)
+
+
+@pytest.mark.parametrize("confidence", [-0.01, 1.01])
+def test_risk_assessment_rejects_out_of_range_confidence(confidence):
+    payload = {**VALID_PAYLOADS["risk_assessment"], "confidence": confidence}
+    with pytest.raises(ValidationError):
+        validate("risk_assessment", payload)
+
+
+@pytest.mark.parametrize("evidence", [None, [], [""], [42]])
+def test_risk_assessment_rejects_missing_or_invalid_evidence(evidence):
+    payload = dict(VALID_PAYLOADS["risk_assessment"])
+    if evidence is None:
+        payload.pop("evidence")
+    else:
+        payload["evidence"] = evidence
+    with pytest.raises(ValidationError):
+        validate("risk_assessment", payload)

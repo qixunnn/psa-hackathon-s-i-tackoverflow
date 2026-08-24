@@ -12,6 +12,8 @@ from backend.agents import (
     agent5_advisory,
 )
 from backend.agents.agent1_relevance import Agent1Error, ArticleExtractionError
+from backend.agents.agent2_risk import Agent2Error
+from backend.agents.agent3_route_retrieval import Agent3Error
 from backend.orchestrator.schema_validation import ValidationError, validate
 
 
@@ -76,6 +78,18 @@ def _agent_failure(state: dict, error: Agent1Error) -> None:
     append_event(state["run_id"], "agent_1_relevance", f"Agent 1 failed: {error}")
 
 
+def _agent2_failure(state: dict, error: Agent2Error) -> None:
+    state["status"] = "error"
+    persist_run(state)
+    append_event(state["run_id"], "agent_2_risk", f"Agent 2 failed: {error}")
+
+
+def _agent3_failure(state: dict, error: Agent3Error) -> None:
+    state["status"] = "error"
+    persist_run(state)
+    append_event(state["run_id"], "agent_3_route_retrieval", f"Agent 3 failed: {error}")
+
+
 def _run_agent(state: dict, status: str, agent_name: str, schema_name: str, agent_callable):
     _set_status(state, status)
     output = agent_callable(state)
@@ -118,20 +132,27 @@ def run_pipeline(
             agent_input["article_text"] = article_text
         event = agent1_relevance.run(agent_input)
         validate("event", event)
-        state["event"] = event
+        accumulated_state = {**state, "event": event}
         if not event["relevant"]:
-            state["status"] = "halted_not_relevant"
+            accumulated_state["status"] = "halted_not_relevant"
+            validate("run", accumulated_state)
+            state = accumulated_state
             persist_run(state)
             append_event(run_id, "agent_1_relevance", "Article assessed as not relevant; pipeline halted.")
             return
-        state["status"] = "assessing_risk"
+        accumulated_state["status"] = "assessing_risk"
+        validate("run", accumulated_state)
+        state = accumulated_state
         persist_run(state)
         append_event(run_id, "agent_1_relevance", "Article extracted and confirmed relevant.")
 
-        risk = _run_agent(state, "assessing_risk", "agent_2_risk", "risk_assessment", agent2_risk.run)
-        state["risk_assessment"] = risk
-        state["status"] = "retrieving_routes"
+        risk = agent2_risk.run(event)
+        validate("risk_assessment", risk)
+        accumulated_state = {**state, "risk_assessment": risk}
+        validate("run", accumulated_state)
+        state = accumulated_state
         persist_run(state)
+        _set_status(state, "retrieving_routes")
         append_event(run_id, "agent_2_risk", "Risk assessment completed.")
 
         candidates = _run_agent(
@@ -141,10 +162,20 @@ def run_pipeline(
             "candidate_route",
             agent3_route_retrieval.run,
         )
-        state["candidate_routes"] = candidates
-        state["status"] = "ranking"
+        _, unsupported_chokepoints = agent3_route_retrieval.graph_coverage(state)
+        accumulated_state = {**state, "candidate_routes": candidates, "status": "ranking"}
+        validate("run", accumulated_state)
+        state = accumulated_state
         persist_run(state)
-        append_event(run_id, "agent_3_route_retrieval", "Candidate routes retrieved from route graph.")
+        route_ids = ", ".join(candidate["route_id"] for candidate in candidates) or "none"
+        message = f"Candidate route references retrieved from route graph: {route_ids}."
+        if unsupported_chokepoints:
+            message += (
+                " Valid chokepoint(s) unsupported by the MVP graph: "
+                + ", ".join(unsupported_chokepoints)
+                + "."
+            )
+        append_event(run_id, "agent_3_route_retrieval", message)
 
         ranked = _run_agent(state, "ranking", "agent_4_ranking", "ranked_route", agent4_ranking.run)
         state["ranked_routes"] = ranked
@@ -165,3 +196,7 @@ def run_pipeline(
         _validation_failure(state, error)
     except Agent1Error as error:
         _agent_failure(state, error)
+    except Agent2Error as error:
+        _agent2_failure(state, error)
+    except Agent3Error as error:
+        _agent3_failure(state, error)

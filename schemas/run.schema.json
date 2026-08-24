@@ -11,7 +11,13 @@
     },
     "submitted_by": { "type": "string" },
     "submitted_at": { "type": "string", "format": "date-time" },
-    "source_url": { "type": "string", "format": "uri" }
+    "source_url": { "type": "string", "format": "uri" },
+    "event": { "$ref": "event.schema.json" },
+    "risk_assessment": { "$ref": "risk_assessment.schema.json" },
+    "candidate_routes": {
+      "type": "array",
+      "items": { "$ref": "candidate_route.schema.json" }
+    }
   },
   "required": ["run_id", "status", "submitted_by", "submitted_at", "source_url"]
 }

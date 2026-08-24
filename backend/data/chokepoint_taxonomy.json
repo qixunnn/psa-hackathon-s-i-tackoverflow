@@ -1,0 +1,18 @@
+{
+  "chokepoints": {
+    "Strait of Hormuz": ["Hormuz Strait"],
+    "Bab el-Mandeb": [
+      "Bab al-Mandab",
+      "Bab al-Mandeb",
+      "Bab-el-Mandeb",
+      "Bab el-Mandeb strait",
+      "Strait of Bab el-Mandeb"
+    ],
+    "Strait of Malacca": ["Malacca Strait"]
+  },
+  "non_chokepoint_regions": [
+    "Red Sea",
+    "Gulf of Oman",
+    "Arabian Sea"
+  ]
+}

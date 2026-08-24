@@ -1,0 +1,92 @@
+{
+  "run_id": "10d854d0-8833-4024-b84f-dfbd8431262e",
+  "status": "complete",
+  "submitted_by": "operator",
+  "submitted_at": "2026-08-24T18:55:41.976138Z",
+  "source_url": "https://www.straitstimes.com/world/middle-east/pakistan-says-us-and-iran-close-to-some-sort-of-deal-despite-attacks-on-shipping",
+  "event": {
+    "relevant": true,
+    "confidence": 0.95,
+    "relevance_rationale": "The closure of the Strait of Hormuz and active attacks on commercial shipping in the Gulf of Oman and Bab el-Mandeb strait disrupt major international maritime trade routes, directly impacting global container supply chains and PSA-bound vessel operations.",
+    "summary": "Iranian officials announced that the Strait of Hormuz will remain closed until the US meets Tehran's conditions, counteracting hopes raised by mediator Pakistan of an impending agreement. Concurrently, maritime security risks persist with reported missile and drone attacks on vessels in the Gulf of Oman and Bab el-Mandeb strait.",
+    "entities": {
+      "location": "Strait of Hormuz",
+      "event_type": "Maritime blockade and attacks on shipping",
+      "date": "Aug 11",
+      "actors": [
+        "Iran",
+        "US",
+        "Houthis",
+        "Pakistan",
+        "Oman"
+      ],
+      "chokepoints_mentioned": [
+        "Strait of Hormuz",
+        "Bab el-Mandeb",
+        "Gulf of Oman",
+        "Red Sea"
+      ]
+    },
+    "evidence": [
+      "The Strait of Hormuz will remain closed as long as the US does not change its behaviour and accept Iran\u2019s conditions to end the war, the newly appointed secretary of Iran\u2019s Supreme National Security Council said on Aug 11.",
+      "Adding to the rhetoric from both sides were reports of new attacks on shipping in the Gulf of Oman and the Red Sea, highlighting the threat to maritime trade."
+    ],
+    "run_id": "10d854d0-8833-4024-b84f-dfbd8431262e",
+    "source_url": "https://www.straitstimes.com/world/middle-east/pakistan-says-us-and-iran-close-to-some-sort-of-deal-despite-attacks-on-shipping",
+    "extracted_at": "2026-08-24T18:55:52.051844Z"
+  },
+  "risk_assessment": {
+    "run_id": "10d854d0-8833-4024-b84f-dfbd8431262e",
+    "severity": "High",
+    "probability": 0.7,
+    "affected_chokepoints": [
+      "Strait of Hormuz"
+    ],
+    "estimated_duration": "3-5 days",
+    "rationale": "Tension at the Strait of Hormuz creates a material risk of transit delay."
+  },
+  "candidate_routes": [
+    {
+      "run_id": "10d854d0-8833-4024-b84f-dfbd8431262e",
+      "route_id": "RT-001-BASELINE",
+      "retrieved_reason": "Baseline route retained for comparison."
+    },
+    {
+      "run_id": "10d854d0-8833-4024-b84f-dfbd8431262e",
+      "route_id": "RT-002-FUJAIRAH-BYPASS",
+      "retrieved_reason": "Avoids affected chokepoints."
+    }
+  ],
+  "ranked_routes": [
+    {
+      "run_id": "10d854d0-8833-4024-b84f-dfbd8431262e",
+      "route_id": "RT-002-FUJAIRAH-BYPASS",
+      "rank": 1,
+      "score": 0.88,
+      "eta": "2026-09-06T16:26:26.878600Z",
+      "eta_delta_days": 2,
+      "rationale": "Balances chokepoint exposure and transit time."
+    },
+    {
+      "run_id": "10d854d0-8833-4024-b84f-dfbd8431262e",
+      "route_id": "RT-001-BASELINE",
+      "rank": 2,
+      "score": 0.65,
+      "eta": "2026-09-04T16:26:26.878600Z",
+      "eta_delta_days": 0,
+      "rationale": "Balances chokepoint exposure and transit time."
+    }
+  ],
+  "advisory": {
+    "run_id": "10d854d0-8833-4024-b84f-dfbd8431262e",
+    "headline": "Prepare for possible Strait of Hormuz delay",
+    "summary": "Strait of Hormuz tension may delay the vessel by several days.",
+    "recommended_actions": [
+      "Flag berth slot for possible delay",
+      "Notify transshipment partners"
+    ],
+    "confidence": 0.85,
+    "operator_decision": "pending",
+    "operator_comment": null
+  }
+}

@@ -1,0 +1,8 @@
+[
+  {
+    "run_id": "a49700d2-c54d-4e57-bde9-874bfe7c5154",
+    "timestamp": "2026-08-24T18:49:37.430237Z",
+    "agent": "agent_1_relevance",
+    "message": "Agent 1 failed: GEMINI_API_KEY is required for Agent 1"
+  }
+]

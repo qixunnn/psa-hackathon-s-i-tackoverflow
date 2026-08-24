@@ -6,10 +6,16 @@
   "properties": {
     "run_id": { "type": "string" },
     "severity": { "type": "string", "enum": ["Low", "Medium", "High", "Critical"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
     "probability": { "type": "number", "minimum": 0, "maximum": 1 },
     "affected_chokepoints": { "type": "array", "items": { "type": "string" } },
     "estimated_duration": { "type": "string" },
-    "rationale": { "type": "string" }
+    "rationale": { "type": "string" },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
   },
-  "required": ["run_id", "severity", "probability", "affected_chokepoints", "estimated_duration", "rationale"]
+  "required": ["run_id", "severity", "confidence", "probability", "affected_chokepoints", "estimated_duration", "rationale", "evidence"]
 }
