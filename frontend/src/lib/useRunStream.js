@@ -36,6 +36,13 @@ export function useRunStream(runId) {
       } catch {
         status = undefined
       }
+      if (status) {
+        setState((current) => ({
+          ...current,
+          status,
+          run: current.run ? { ...current.run, status } : current.run,
+        }))
+      }
       refresh(status)
       if (TERMINAL_STATUSES.has(status)) source.close()
     }

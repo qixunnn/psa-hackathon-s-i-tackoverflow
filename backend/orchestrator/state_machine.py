@@ -14,6 +14,8 @@ from backend.agents import (
 from backend.agents.agent1_relevance import Agent1Error, ArticleExtractionError
 from backend.agents.agent2_risk import Agent2Error
 from backend.agents.agent3_route_retrieval import Agent3Error
+from backend.agents.agent4_ranking import Agent4Error
+from backend.agents.agent5_advisory import Agent5Error
 from backend.orchestrator.schema_validation import ValidationError, validate
 
 
@@ -88,6 +90,18 @@ def _agent3_failure(state: dict, error: Agent3Error) -> None:
     state["status"] = "error"
     persist_run(state)
     append_event(state["run_id"], "agent_3_route_retrieval", f"Agent 3 failed: {error}")
+
+
+def _agent4_failure(state: dict, error: Agent4Error) -> None:
+    state["status"] = "error"
+    persist_run(state)
+    append_event(state["run_id"], "agent_4_ranking", f"Agent 4 failed: {error}")
+
+
+def _agent5_failure(state: dict, error: Agent5Error) -> None:
+    state["status"] = "error"
+    persist_run(state)
+    append_event(state["run_id"], "agent_5_advisory", f"Agent 5 failed: {error}")
 
 
 def _run_agent(state: dict, status: str, agent_name: str, schema_name: str, agent_callable):
@@ -180,12 +194,14 @@ def run_pipeline(
         ranked = _run_agent(state, "ranking", "agent_4_ranking", "ranked_route", agent4_ranking.run)
         state["ranked_routes"] = ranked
         state["status"] = "advising"
+        validate("run", state)
         persist_run(state)
         append_event(run_id, "agent_4_ranking", "Candidate routes ranked with ETA impact.")
 
         advisory = _run_agent(state, "advising", "agent_5_advisory", "advisory", agent5_advisory.run)
         state["advisory"] = advisory
         state["status"] = "complete"
+        validate("run", state)
         persist_run(state)
         append_event(run_id, "agent_5_advisory", "Advisory generated; operator decision pending.")
     except ArticleExtractionError as error:
@@ -200,3 +216,7 @@ def run_pipeline(
         _agent2_failure(state, error)
     except Agent3Error as error:
         _agent3_failure(state, error)
+    except Agent4Error as error:
+        _agent4_failure(state, error)
+    except Agent5Error as error:
+        _agent5_failure(state, error)

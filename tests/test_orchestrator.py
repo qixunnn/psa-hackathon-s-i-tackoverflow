@@ -51,8 +51,46 @@ def client(tmp_path, monkeypatch):
             "evidence": [event["evidence"][0]],
         }
 
+    def canned_agent4(state):
+        return [
+            {
+                "run_id": state["run_id"],
+                "route_id": "RT-002-FUJAIRAH-BYPASS",
+                "rank": 1,
+                "score": 0.8,
+                "eta": "2026-09-06T00:00:00Z",
+                "eta_delta_days": 2,
+                "rationale": "Avoids the affected chokepoint with a modest transit delay.",
+            },
+            {
+                "run_id": state["run_id"],
+                "route_id": "RT-001-BASELINE",
+                "rank": 2,
+                "score": 0.6,
+                "eta": "2026-09-04T00:00:00Z",
+                "eta_delta_days": 0,
+                "rationale": "Shortest route but remains exposed to the affected chokepoint.",
+            },
+        ]
+
+    def canned_agent5(state):
+        return {
+            "run_id": state["run_id"],
+            "headline": "Prepare for possible Strait of Hormuz delay",
+            "summary": "A validated disruption may affect PSA-bound arrival timing.",
+            "recommended_actions": [
+                "Review berth planning",
+                "Notify transshipment partners",
+            ],
+            "confidence": 0.8,
+            "operator_decision": "pending",
+            "operator_comment": None,
+        }
+
     monkeypatch.setattr(agent1_relevance, "run", canned_agent1)
     monkeypatch.setattr(agent2_risk, "run", canned_agent2)
+    monkeypatch.setattr(state_machine.agent4_ranking, "run", canned_agent4)
+    monkeypatch.setattr(state_machine.agent5_advisory, "run", canned_agent5)
     return TestClient(main.app)
 
 

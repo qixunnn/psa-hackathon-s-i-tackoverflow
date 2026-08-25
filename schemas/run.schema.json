@@ -17,7 +17,12 @@
     "candidate_routes": {
       "type": "array",
       "items": { "$ref": "candidate_route.schema.json" }
-    }
+    },
+    "ranked_routes": {
+      "type": "array",
+      "items": { "$ref": "ranked_route.schema.json" }
+    },
+    "advisory": { "$ref": "advisory.schema.json" }
   },
   "required": ["run_id", "status", "submitted_by", "submitted_at", "source_url"]
 }

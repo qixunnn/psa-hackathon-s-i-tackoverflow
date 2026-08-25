@@ -37,6 +37,12 @@ describe('AgentPipelineRail', () => {
     expect(screen.getByText('Ranking & Impact').nextElementSibling).toHaveTextContent('queued')
     expect(screen.getByText('Advisory & Recommendation').nextElementSibling).toHaveTextContent('queued')
   })
+
+  it('uses pipeline status to avoid stale running states before refreshed output arrives', () => {
+    render(<AgentPipelineRail run={{ status: 'assessing_risk' }} />)
+    expect(screen.getByText('Relevance & Extraction').nextElementSibling).toHaveTextContent('done')
+    expect(screen.getByText('Risk & Severity').nextElementSibling).toHaveTextContent('running')
+  })
 })
 
 describe('AdvisoryCard', () => {
