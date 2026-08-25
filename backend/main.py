@@ -16,12 +16,15 @@ from backend.orchestrator.schema_validation import validate
 from backend.orchestrator.state_machine import (
     EVENTS_DIRECTORY,
     RUNS_DIRECTORY,
+    append_event,
     persist_run,
     run_pipeline,
 )
 
 
-ROUTE_GRAPH_PATH = Path(__file__).resolve().parent / "data" / "route_graph.json"
+DATA_DIRECTORY = Path(__file__).resolve().parent / "data"
+ROUTE_GRAPH_PATH = DATA_DIRECTORY / "route_graph.json"
+VESSEL_PATH = DATA_DIRECTORY / "vessel.json"
 
 
 app = FastAPI(title="PSA Sentinel")
@@ -122,10 +125,16 @@ def get_routes():
     return _read_json(ROUTE_GRAPH_PATH)
 
 
+@app.get("/vessel")
+def get_vessel():
+    """Expose the MVP vessel so the Route Graph Viewer can mark the baseline."""
+    return _read_json(VESSEL_PATH)
+
+
 @app.get("/runs")
 def list_runs():
     runs = []
-    for path in sorted(RUNS_DIRECTORY.glob("*.json")):
+    for path in RUNS_DIRECTORY.glob("*.json"):
         state = _read_json(path)
         runs.append({
             "run_id": state["run_id"],
@@ -135,8 +144,13 @@ def list_runs():
             "relevant": state.get("event", {}).get("relevant"),
             "severity": state.get("risk_assessment", {}).get("severity"),
             "probability": state.get("risk_assessment", {}).get("probability"),
+            "headline": state.get("advisory", {}).get("headline"),
             "operator_decision": state.get("advisory", {}).get("operator_decision"),
+            "operator_comment": state.get("advisory", {}).get("operator_comment"),
         })
+    # Newest first: the History view is an audit trail, and filename order is
+    # UUID order, which is meaningless.
+    runs.sort(key=lambda summary: summary["submitted_at"], reverse=True)
     return runs
 
 
@@ -167,8 +181,14 @@ def decide_run(run_id: str, request: DecisionRequest):
     state = _read_json(run_path)
     if "advisory" not in state:
         raise HTTPException(status_code=409, detail="Run has no advisory")
+    comment = request.comment.strip() if request.comment else ""
     state["advisory"]["operator_decision"] = request.decision
-    state["advisory"]["operator_comment"] = request.comment
+    state["advisory"]["operator_comment"] = comment or None
     validate("advisory", state["advisory"])
     persist_run(state)
+    # The human decision closes the loop, so it belongs in the audit trail.
+    message = f"Operator {request.decision} the advisory."
+    if comment:
+        message += f" Comment: {comment}"
+    append_event(run_id, "operator", message)
     return state["advisory"]

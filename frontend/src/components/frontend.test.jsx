@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import UrlSubmitForm from './UrlSubmitForm'
 import AgentPipelineRail from './AgentPipelineRail'
 import AdvisoryCard from './AdvisoryCard'
+import HistoryPanel from './HistoryPanel'
 import RouteComparisonPanel from './RouteComparisonPanel'
+import RouteGraphViewer from './RouteGraphViewer'
 import { submitDecision, submitRun } from '../lib/api'
 
 vi.mock('../lib/api', () => ({
@@ -63,6 +65,77 @@ describe('AdvisoryCard', () => {
     expect(screen.getByRole('button', { name: 'Accept' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeDisabled()
     await waitFor(() => expect(screen.getByText(/Decision recorded: accepted/)).toBeInTheDocument())
+  })
+
+  it('records an operator comment alongside the decision', async () => {
+    render(<AdvisoryCard run={completeRun} />)
+    fireEvent.change(screen.getByLabelText('Operator comment'), { target: { value: 'Berth slot already held.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(submitDecision).toHaveBeenCalledWith('run-1', 'dismissed', 'Berth slot already held.')
+    await waitFor(() => expect(screen.getByText(/Berth slot already held\./)).toBeInTheDocument())
+  })
+
+  it('locks controls for a run that was already decided in an earlier session', async () => {
+    const decidedRun = { ...completeRun, advisory: { ...completeRun.advisory, operator_decision: 'accepted', operator_comment: 'Actioned by duty desk.' } }
+    const { rerender } = render(<AdvisoryCard run={null} />)
+    rerender(<AdvisoryCard run={decidedRun} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Accept' })).toBeDisabled())
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toBeDisabled()
+    expect(screen.getByText(/Actioned by duty desk\./, { selector: 'em' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Override' }))
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toBeEnabled()
+  })
+
+  it('flags a low-confidence advisory for mandatory review', () => {
+    render(<AdvisoryCard run={{ ...completeRun, advisory: { ...completeRun.advisory, confidence: 0.42 } }} />)
+    expect(screen.getByText(/mandatory human review/i)).toBeInTheDocument()
+  })
+})
+
+describe('HistoryPanel', () => {
+  const runs = [
+    { run_id: 'run-2', source_url: 'https://news.example/hormuz', status: 'complete', submitted_at: '2026-08-02T10:00:00Z', relevant: true, severity: 'High', probability: 0.7, headline: 'Delay risk', operator_decision: 'accepted' },
+    { run_id: 'run-1', source_url: 'https://news.example/local', status: 'halted_not_relevant', submitted_at: '2026-08-01T10:00:00Z', relevant: false, severity: null, probability: null, headline: null, operator_decision: null },
+  ]
+
+  it('renders each past run with its outcome and drills down on demand', () => {
+    const onSelectRun = vi.fn()
+    render(<HistoryPanel runs={runs} activeRunId="run-2" onSelectRun={onSelectRun} />)
+    expect(screen.getByText('Advisory issued')).toBeInTheDocument()
+    expect(screen.getByText('No PSA impact')).toBeInTheDocument()
+    expect(screen.getByText('accepted')).toBeInTheDocument()
+    expect(screen.getByText('70%')).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Open' })[1])
+    expect(onSelectRun).toHaveBeenCalledWith('run-1')
+  })
+
+  it('explains the empty audit trail instead of rendering a bare table', () => {
+    render(<HistoryPanel runs={[]} onSelectRun={vi.fn()} />)
+    expect(screen.getByText(/No runs recorded yet/)).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  })
+})
+
+describe('RouteGraphViewer', () => {
+  const routes = [
+    { route_id: 'RT-001-BASELINE', origin: 'Jebel Ali', destination: 'PSA Singapore', waypoints: ['Jebel Ali', 'Strait of Hormuz', 'PSA Singapore'], chokepoints: ['Strait of Hormuz'], distance_nm: 3900, base_transit_days: 11 },
+    { route_id: 'RT-002-FUJAIRAH-BYPASS', origin: 'Jebel Ali', destination: 'PSA Singapore', waypoints: ['Jebel Ali', 'Gulf of Oman', 'PSA Singapore'], chokepoints: [], distance_nm: 4100, base_transit_days: 13 },
+  ]
+
+  it('marks the scheduled baseline and the routes exposed to the live risk', () => {
+    render(<RouteGraphViewer routes={routes} vessel={{ vessel_name: 'MV Pacific Voyager', scheduled_route_id: 'RT-001-BASELINE', scheduled_arrival: '2026-09-04T16:26:26Z' }} affectedChokepoints={['Strait of Hormuz']} />)
+    expect(screen.getByText('Scheduled baseline')).toBeInTheDocument()
+    expect(screen.getByText('Exposed')).toBeInTheDocument()
+    expect(screen.getByText('3,900 nm')).toBeInTheDocument()
+    expect(screen.getByText('MV Pacific Voyager')).toBeInTheDocument()
+  })
+
+  it('states the graph is lookup-only so judges see the agent cannot invent routes', () => {
+    render(<RouteGraphViewer routes={routes} />)
+    expect(screen.getByText(/never route invention/i)).toBeInTheDocument()
+    expect(screen.queryByText('Exposed')).not.toBeInTheDocument()
   })
 })
 

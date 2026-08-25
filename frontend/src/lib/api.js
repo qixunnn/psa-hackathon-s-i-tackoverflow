@@ -30,6 +30,10 @@ export function getRoutes() {
   return request('/routes')
 }
 
+export function getVessel() {
+  return request('/vessel')
+}
+
 export function listRuns() {
   return request('/runs')
 }

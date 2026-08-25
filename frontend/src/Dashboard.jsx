@@ -1,35 +1,59 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
-  Activity, ChevronDown, Globe2, Home, Layers3, Map, Radio, RefreshCw, ShieldCheck,
+  Activity, ChevronDown, Globe2, History, Home, Layers3, Map, Radio, RefreshCw, ShieldCheck, Waypoints, X,
 } from 'lucide-react'
 import UrlSubmitForm from './components/UrlSubmitForm'
 import AgentPipelineRail from './components/AgentPipelineRail'
 import EventLog from './components/EventLog'
 import AdvisoryCard from './components/AdvisoryCard'
+import HistoryPanel from './components/HistoryPanel'
 import MapPanel from './components/MapPanel'
 import RiskTrendStrip from './components/RiskTrendStrip'
 import RouteComparisonPanel from './components/RouteComparisonPanel'
-import { getRoutes, listRuns } from './lib/api'
+import RouteGraphViewer from './components/RouteGraphViewer'
+import { getRoutes, getVessel, listRuns } from './lib/api'
 import { useRunStream } from './lib/useRunStream'
+
+const NAV = [
+  { id: 'home', label: 'Home', Icon: Home },
+  { id: 'history', label: 'History', Icon: History },
+  { id: 'routes', label: 'Route graph', Icon: Waypoints },
+]
 
 export default function Dashboard() {
   const [runId, setRunId] = useState(null)
   const [routes, setRoutes] = useState([])
+  const [vessel, setVessel] = useState(null)
   const [recentRuns, setRecentRuns] = useState([])
   const [viewMode, setViewMode] = useState('2D')
+  const [view, setView] = useState('home')
   const { status, run, events, isLoading } = useRunStream(runId)
+
+  const refreshRuns = useCallback(() => { listRuns().then(setRecentRuns).catch(() => {}) }, [])
 
   useEffect(() => {
     getRoutes().then(setRoutes).catch(() => {})
-    listRuns().then(setRecentRuns).catch(() => {})
-  }, [status])
+    refreshRuns()
+  }, [status, refreshRuns])
+
+  useEffect(() => { getVessel().then(setVessel).catch(() => {}) }, [])
+
+  function openRun(nextRunId) {
+    setRunId(nextRunId)
+    setView('home')
+  }
 
   return <main className="command-shell">
     <header className="command-header">
       <div className="header-left">
         <div className="shield-logo"><ShieldCheck size={20} /></div>
         <nav className="primary-nav" aria-label="Primary navigation">
-          <button className="nav-button active"><Home size={15} /> Home</button>
+          {NAV.map(({ id, label, Icon }) => <button
+            key={id}
+            className={`nav-button ${view === id ? 'active' : ''}`}
+            aria-current={view === id ? 'page' : undefined}
+            onClick={() => setView(id)}
+          ><Icon size={15} /> {label}</button>)}
         </nav>
         <div className="product-title"><strong>PSA Sentinel</strong><span>Agentic supply-chain risk advisory</span></div>
       </div>
@@ -72,9 +96,16 @@ export default function Dashboard() {
         <section className="run-context-card"><span className="eyebrow">Current assessment</span>{run ? <><strong>{run.event?.entities?.event_type || 'Analysing submitted article'}</strong><p>{run.event?.summary || 'The pipeline is extracting maritime relevance and event entities.'}</p><div><span>Source</span><b>{new URL(run.source_url).hostname}</b><span>Severity</span><b>{run.risk_assessment?.severity || 'Pending'}</b><span>Probability</span><b>{run.risk_assessment ? `${Math.round(run.risk_assessment.probability * 100)}%` : 'Pending'}</b></div></> : <p>Submit one article URL. The five-agent pipeline will assess its relevance to MV Pacific Voyager and the Jebel Ali–Singapore corridor.</p>}</section>
         {runId && <div className="active-run-strip"><span>RUN {runId.slice(0, 8)}</span><b className={`status-${status}`}>{isLoading ? 'UPDATING' : status?.replaceAll('_', ' ')}</b></div>}
         <AgentPipelineRail run={run} />
-        <AdvisoryCard run={run} />
+        <AdvisoryCard run={run} onDecided={refreshRuns} />
         <RouteComparisonPanel run={run} routes={routes} />
       </aside>
     </div>
+
+    {view !== 'home' && <div className="workspace-overlay" role="dialog" aria-modal="true" aria-label={view === 'history' ? 'History' : 'Route graph viewer'}>
+      <button className="workspace-close" onClick={() => setView('home')} aria-label="Close"><X size={16} /> Back to dashboard</button>
+      {view === 'history'
+        ? <HistoryPanel runs={recentRuns} activeRunId={runId} onSelectRun={openRun} />
+        : <RouteGraphViewer routes={routes} vessel={vessel} affectedChokepoints={run?.risk_assessment?.affected_chokepoints || []} />}
+    </div>}
   </main>
 }

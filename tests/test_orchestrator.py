@@ -358,3 +358,62 @@ def test_malformed_gemini_output_sets_pipeline_error(client, monkeypatch):
 
     assert state["status"] == "error"
     assert "risk_assessment" not in state
+
+
+def test_vessel_endpoint_returns_mvp_vessel(client):
+    response = client.get("/vessel")
+
+    assert response.status_code == 200
+    vessel = response.json()
+    assert vessel["vessel_name"] == "MV Pacific Voyager"
+    assert vessel["scheduled_route_id"] == "RT-001-BASELINE"
+
+
+def test_history_lists_runs_newest_first_with_audit_fields(client):
+    first = client.post("/runs", json={"source_url": "https://example.com/hormuz"}).json()["run_id"]
+    second = client.post("/runs", json={"source_url": "https://example.com/irrelevant"}).json()["run_id"]
+
+    # Filenames are UUIDs, so only an explicit submitted_at sort is meaningful.
+    for run_id, submitted_at in [(first, "2026-08-01T00:00:00Z"), (second, "2026-08-02T00:00:00Z")]:
+        path = main.RUNS_DIRECTORY / f"{run_id}.json"
+        state = json.loads(path.read_text(encoding="utf-8"))
+        state["submitted_at"] = submitted_at
+        validate("run", state)
+        path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+    history = client.get("/runs").json()
+
+    assert [summary["run_id"] for summary in history] == [second, first]
+    relevant_summary = next(item for item in history if item["run_id"] == first)
+    assert relevant_summary["relevant"] is True
+    assert relevant_summary["severity"] == "High"
+    assert relevant_summary["headline"]
+    assert relevant_summary["operator_decision"] == "pending"
+    halted_summary = next(item for item in history if item["run_id"] == second)
+    assert halted_summary["relevant"] is False
+    assert halted_summary["headline"] is None
+
+
+def test_decision_is_appended_to_the_audit_log(client):
+    run_id = client.post("/runs", json={"source_url": "https://example.com/hormuz"}).json()["run_id"]
+
+    client.post(
+        f"/runs/{run_id}/decision",
+        json={"decision": "dismissed", "comment": "Duplicate of an earlier bulletin."},
+    )
+    events = client.get(f"/runs/{run_id}/events").json()
+
+    assert events[-1]["agent"] == "operator"
+    assert "dismissed" in events[-1]["message"]
+    assert "Duplicate of an earlier bulletin." in events[-1]["message"]
+
+
+def test_blank_decision_comment_is_persisted_as_null(client):
+    run_id = client.post("/runs", json={"source_url": "https://example.com/hormuz"}).json()["run_id"]
+
+    advisory = client.post(
+        f"/runs/{run_id}/decision",
+        json={"decision": "accepted", "comment": "   "},
+    ).json()
+
+    assert advisory["operator_comment"] is None
