@@ -1,256 +1,409 @@
-# PSA Global Watch
+# PSA Sentinel
 
-> An AI-powered Global Maritime Risk Intelligence platform that transforms global maritime and geopolitical disruptions into actionable operational intelligence for PSA.
+PSA Sentinel is an agentic maritime risk decision-support prototype built for the PSA Code Sprint. It turns external maritime intelligence into terminal-operational insight: determine whether an event matters to a PSA-linked corridor, assess route exposure, retrieve known alternatives, calculate schedule impact, and recommend actions that remain within PSA's control.
 
----
+> **External disruption → route exposure → schedule impact → PSA operational action**
 
-## Overview
+The MVP follows one vessel on the Rotterdam → PSA Singapore corridor. It combines Gemini-based interpretation with deterministic route retrieval and ETA calculations, then presents the result on a live operator dashboard.
 
-Global supply chains are increasingly affected by geopolitical conflicts, port strikes, severe weather, trade restrictions and disruptions at key maritime chokepoints.
+## The problem
 
-While these events occur outside Singapore, they can eventually influence vessel schedules, route choices and operational planning for major transshipment hubs such as PSA.
+Geopolitical conflict, chokepoint disruption, attacks on commercial shipping, port strikes, severe weather, trade restrictions, and carrier rerouting can change vessel arrivals long before a vessel reaches Singapore.
 
-PSA Global Watch continuously monitors external maritime events, analyses their operational relevance, and provides decision-support recommendations that help operators understand what to monitor and how to prepare.
+For PSA, knowing that an incident happened is only the start. Operators need to understand:
 
-This project is built for the PSA Hackathon.
+- whether a scheduled corridor is exposed;
+- which known alternatives a carrier or vessel operator may use;
+- how the arrival schedule may change; and
+- what berth, crane, manpower, yard, and transshipment plans may need adjustment.
 
----
+## Our solution
 
-# Problem Statement
-
-Current information about global disruptions is fragmented across news outlets, maritime bulletins and public reports.
-
-Operators must manually determine:
-
-- Which events are relevant.
-- Which shipping routes are affected.
-- Whether PSA should be concerned.
-- What operational actions should be considered.
-
-This process is time-consuming and difficult to perform consistently.
-
----
-
-# Our Solution
-
-PSA Global Watch converts external disruptions into operational intelligence.
-
-Instead of simply summarising news, the platform:
-
-1. Detects maritime-relevant events.
-2. Tracks each disruption as an evolving event.
-3. Maps affected chokepoints and shipping routes.
-4. Evaluates possible downstream operational impacts.
-5. Generates Monitor and Prepare recommendations.
-6. Provides transparent reasoning, evidence and confidence.
-
----
-
-# Core Workflow
+PSA Sentinel processes one submitted news article through five specialised agents:
 
 ```text
-External Event
-      │
-      ▼
-Maritime Relevance
-      │
-      ▼
-Event Intelligence
-      │
-      ▼
-Route Exposure
-      │
-      ▼
-Scenario Analysis
-      │
-      ▼
-Potential PSA Impact
-      │
-      ▼
-Monitor / Prepare
+News / Maritime Intelligence
+        → Relevance
+        → Risk Assessment
+        → Route Exposure & Alternatives
+        → ETA / Operational Impact
+        → PSA Advisory
 ```
 
----
+This is not a generic news summariser. LLMs interpret evidence and explain results; deterministic code owns route lookup, scoring inputs, ranks, and ETA mathematics.
 
-# MVP Scope
+## Agentic pipeline
 
-The MVP focuses on the following capabilities:
+| Agent | Purpose and input | What it produces | Implementation choice |
+| --- | --- | --- | --- |
+| **1 — Relevance & Extraction** | Fetches the submitted URL, extracts readable article text, and determines whether it could affect PSA-bound maritime shipping. | A validated `Event`: relevance and confidence, rationale, summary, entities, canonical chokepoints, and verbatim evidence excerpts. | **Gemini Flash + Trafilatura.** Interpretation is useful here, but output is constrained by `event.schema.json`. An irrelevant event ends the pipeline cleanly. |
+| **2 — Risk & Severity** | Consumes only Agent 1's validated event and assesses material transit disruption. | A validated `RiskAssessment`: severity, probability, confidence, affected chokepoints, duration, rationale, and evidence copied from Agent 1. | **Gemini Flash with deterministic checks.** Agent 2 cannot introduce a chokepoint or evidence item Agent 1 did not identify. |
+| **3 — Deterministic Route Retrieval** | Consumes the accumulated run and queries the static route graph for exposure and alternatives. | Validated references to baseline and viable candidate route IDs, with retrieval reasons. | **No LLM.** It performs reproducible graph lookup and never invents a shipping route. |
+| **4 — Ranking & Operational Impact** | Joins candidate IDs to route and vessel data, scores candidates, and calculates arrival impact. | Validated ranked routes containing score, rank, revised ETA, ETA delta, and rationale. | **Deterministic score/rank/ETA; Gemini Flash for wording only.** Gemini explains supplied numbers and cannot change them. |
+| **5 — Advisory & Recommendation** | Consumes the complete validated event, risk, candidate, and ranking state. | A PSA-facing headline, summary, 2–4 recommended actions, derived confidence, and pending operator decision. | **Gemini Flash for synthesis.** Advice is restricted to PSA-controlled terminal operations. |
 
-- Maritime news ingestion
-- Structured event extraction
-- Persistent event memory
-- Evidence and source tracking
-- Chokepoint and route mapping
-- Scenario analysis
-- Potential PSA impact assessment
-- Monitor / Prepare recommendations
-- Global risk dashboard
-- Activity log
+### Agent 1 — Relevance & Extraction
 
----
+Agent 1 uses Trafilatura to fetch and extract an article, then asks Gemini for structured output. Evidence must be short verbatim excerpts from the supplied article. Chokepoint names are canonicalised against the project taxonomy; broad regions such as the Red Sea or Indian Ocean are not treated as chokepoints.
 
-# Technology Stack
+If URL extraction fails, the run enters `awaiting_manual_text`. The backend can resume the same run through `POST /runs/{run_id}/article-text`. The current dashboard does not yet expose that manual-text input, so it is an API-level fallback.
 
-Frontend
+### Agent 2 — Risk & Severity
 
-- Next.js
-- TypeScript
-- Tailwind CSS
+Agent 2 distinguishes:
 
-Backend
+- **severity** — Low, Medium, High, or Critical;
+- **probability** — likelihood of material transit disruption; and
+- **confidence** — confidence in the assessment itself.
 
-- FastAPI
-- Python
-- Pydantic
+The taxonomy recognises Strait of Hormuz, Bab el-Mandeb, Suez Canal, and Strait of Malacca. The MVP graph represents Suez Canal, Bab el-Mandeb, and Strait of Malacca; a recognised chokepoint outside that graph is reported as unsupported rather than converted into an invented route.
 
-Database
+### Agent 3 — Deterministic Route Retrieval
 
-- Supabase PostgreSQL
+Agent 3 loads `backend/data/route_graph.json` and `backend/data/vessel.json`, validates them, and uses the vessel's scheduled route as the baseline. If an affected graph-supported chokepoint traverses the baseline, it retains that route for comparison and returns same-corridor graph alternatives that avoid it.
 
-AI
+Current route knowledge:
 
-- OpenAI API
+- **`RT-001-BASELINE`** — Rotterdam → Mediterranean Sea → Suez Canal → Red Sea → Bab el-Mandeb → Indian Ocean → Strait of Malacca → PSA Singapore; 8,300 nm and 24 base transit days.
+- **`RT-002-CAPE-BYPASS`** — Rotterdam → Atlantic Ocean → Cape of Good Hope → Indian Ocean → Strait of Malacca → PSA Singapore; 11,700 nm and 34 base transit days.
 
-Simulation
+This boundary is deliberate: deterministic retrieval is auditable, reproducible, and prevents hallucinated maritime routes.
 
-- NumPy
+### Agent 4 — Ranking & Operational Impact
 
-Maps
+Agent 4 calculates each candidate's score from:
 
-- MapLibre / Mapbox
+- **75% route-risk score** — exposed routes are penalised using disruption probability and a fixed severity factor;
+- **15% transit score** — shorter candidate transit time scores higher; and
+- **10% distance score** — shorter candidate distance scores higher.
 
----
+Routes are sorted by descending score, then ETA delta and route ID for deterministic tie-breaking. ETA impact is also deterministic:
 
-# Architecture Principles
-
-The project follows one important design principle:
-
-> **LLM interprets. Deterministic code calculates.**
-
-The LLM is responsible for understanding and structuring information.
-
-Deterministic application logic is responsible for calculations, validation, persistence, authorization and scenario execution.
-
----
-
-# Repository Structure
-
-```
-docs/
-frontend/
-backend/
-data/
+```text
+ETA delta = candidate base transit days − baseline base transit days
+Revised ETA = scheduled vessel arrival + ETA delta
 ```
 
-Documentation is written before implementation to support collaborative development.
+For the current Cape bypass data, `34 − 24 = +10 days`. That value comes from route data and Agent 4—not the article or Agent 5. Gemini contributes only concise route rationale after calculation.
 
----
+### Agent 5 — Advisory & Recommendation
 
-# Team
+Agent 5 translates upstream results into actions a PSA planner can own, such as:
 
-This project is developed by Team Sitack Overflow for the PSA Hackathon.
+- monitor vessel trajectory and revised ETA;
+- replan berth windows and quay-crane deployment;
+- adjust terminal manpower or gang scheduling;
+- prepare yard capacity and vessel-bunching contingencies;
+- review transshipment connections; and
+- coordinate revised port-call timing with the carrier.
 
----
+PSA Sentinel does **not** tell PSA to change vessel navigation, routing, or speed. Those decisions belong to the vessel master, shipping line, or carrier. Agent 5 treats the selected route as an external operator decision and focuses on its terminal consequences.
 
-# Run the Backend Locally
+## Why this is agentic
 
-From the repository root:
+PSA Sentinel is more than one large prompt:
+
+- each agent has one specialised responsibility;
+- every stage consumes validated upstream output;
+- the shared run state accumulates explicit, inspectable artefacts;
+- deterministic tools replace generation where correctness matters;
+- state is persisted after every transition;
+- malformed output halts the pipeline instead of silently propagating; and
+- the UI exposes agent progress and the resulting audit trail.
+
+Conceptually:
+
+```text
+Article
+  → Agent 1 confirms maritime relevance and extracts evidence
+  → Agent 2 identifies Bab el-Mandeb risk
+  → Agent 3 retrieves the predefined Cape alternative
+  → Agent 4 ranks it and calculates the +10-day demo impact
+  → Agent 5 recommends terminal-side preparation
+```
+
+The `+10 days` result is specific to the current deterministic demo routes.
+
+## Demo scenario
+
+The flagship MVP scenario follows **MV Pacific Voyager** from **Rotterdam to PSA Singapore**.
+
+**Scheduled corridor**
+
+```text
+Rotterdam → Suez Canal → Red Sea → Bab el-Mandeb
+          → Indian Ocean → Strait of Malacca → PSA Singapore
+```
+
+**Disruption:** Bab el-Mandeb / Red Sea security conditions make the scheduled corridor operationally exposed.
+
+**Graph alternative:** `RT-002-CAPE-BYPASS` travels around the Cape of Good Hope before crossing the Indian Ocean to Malacca and Singapore.
+
+This scenario is useful because baseline exposure is visible, the alternative is intuitive, and its longer transit translates directly into berth, resource, yard, and transshipment planning consequences.
+
+The information lineage is explicit:
+
+| Stage | Source of truth |
+| --- | --- |
+| Incident facts and excerpts | Submitted article, extracted by Agent 1 |
+| Severity, probability, and affected chokepoint | Agent 2 assessment of Agent 1's validated evidence |
+| Baseline and Cape route knowledge | Static route graph queried by Agent 3 |
+| Rank, score, revised ETA, and ETA delta | Agent 4 deterministic calculation |
+| PSA operational response | Agent 5 synthesis of the validated accumulated state |
+
+## System architecture
+
+```mermaid
+flowchart LR
+    A[Article URL / text] --> B[Agent 1<br/>Relevance & Extraction]
+    B --> C[Agent 2<br/>Risk & Severity]
+    C --> D[Agent 3<br/>Deterministic Route Retrieval]
+    D --> E[Agent 4<br/>Ranking & Impact]
+    E --> F[Agent 5<br/>PSA Advisory]
+    F --> G[Operator Dashboard]
+    H[(Route graph<br/>Vessel data)] --> D
+    H --> E
+    I[(JSON Schemas)] -. validate .-> B
+    I -. validate .-> C
+    I -. validate .-> D
+    I -. validate .-> E
+    I -. validate .-> F
+```
+
+- **Frontend:** React single-page dashboard built with Vite. MapLibre renders the corridor, selected route, and risk marker. An SSE client follows pipeline status and refreshes accumulated run data.
+- **API:** FastAPI creates runs, serves routes/vessel/history, streams status, accepts manual article text, and persists operator decisions.
+- **Orchestrator:** a sequential five-stage state machine launched as a FastAPI background task. States are `queued → extracting → assessing_risk → retrieving_routes → ranking → advising → complete`, with explicit not-relevant, manual-text, and error outcomes.
+- **Data:** checked-in JSON schemas, a two-route MVP graph, one mocked vessel, a chokepoint taxonomy, and local JSON run/event storage.
+- **AI:** Google Gemini Flash is used by Agents 1, 2, 4, and 5. Agent 3 has no Gemini dependency.
+
+## Shared state and schema validation
+
+Agents communicate through an accumulated `Run`, not loose prose. The orchestrator adds these validated outputs in order:
+
+```text
+Run → Event → RiskAssessment → CandidateRoute[] → RankedRoute[] → Advisory
+```
+
+The Draft 7 schemas in `schemas/` reject extra fields and enforce required fields, types, enumerations, URI/date formats, and confidence bounds. Additional application checks enforce matching `run_id` values, known route references, canonical chokepoints, and evidence lineage.
+
+If an agent fails or produces malformed output, the run becomes `error`; downstream outputs are not fabricated.
+
+## Human in the loop
+
+The dashboard supports this operator workflow:
+
+1. Submit an article URL and optional note.
+2. Watch all five agent cards transition through live states via SSE.
+3. Review the event, risk severity/probability, candidate routes, ranking, revised ETA, and ETA delta.
+4. Read Agent 5's advisory and expand upstream reasoning.
+5. Accept or dismiss the advisory with an optional comment.
+6. Reopen the persisted run and decision from History.
+
+Accept/Dismiss decisions and comments are persisted and appended to the event log. “Request more detail” currently expands existing risk and route rationale; it does not launch another model call. Recommended-action checkboxes are presentation controls and are not persisted.
+
+## Route map
+
+Before a run, the map shows only the scheduled baseline. After Agent 3, candidate routes become visible. After Agent 4, the rank-1 route controls the selected high-visibility line, while the baseline remains muted/dashed for comparison. The vessel card and legend show the selected route, revised ETA, and ETA delta. Risk markers appear only for affected chokepoints represented by visible route data.
+
+The route metrics and polylines are deterministic demo data. They are geographically illustrative, not navigation-grade routing and not live AIS positions.
+
+## Auditability
+
+Each transition is persisted to local JSON and appended to a timestamped system event log. A reviewer can trace:
+
+- Agent 1's relevance decision, entities, and article evidence;
+- Agent 2's risk assessment and affected chokepoints;
+- Agent 3's exact graph route references and unsupported graph chokepoints;
+- Agent 4's ranking, score, ETA, and route rationale;
+- Agent 5's advisory, confidence, and actions; and
+- the operator's final decision and comment.
+
+The History view lists past runs and can reopen their complete state.
+
+## Tech stack
+
+| Layer | Current implementation |
+| --- | --- |
+| Frontend | React, JavaScript, Vite, MapLibre GL JS, Lucide React, CSS/Tailwind tooling |
+| Backend | Python, FastAPI, Pydantic, Uvicorn |
+| AI | Google Gen AI SDK with a configurable Gemini Flash model |
+| Article extraction | Trafilatura |
+| Contracts | JSON Schema Draft 7 via `jsonschema` |
+| Realtime status | Server-Sent Events (SSE) |
+| Persistence | Local JSON files under `backend/storage/` |
+| Tests | Pytest, Vitest, React Testing Library |
+
+There is no database, Supabase dependency, OpenAI API dependency, AIS feed, or external maritime-routing API in the current MVP.
+
+## Project structure
+
+```text
+PSA-hackathon/
+├── backend/
+│   ├── agents/                 # Five agent implementations
+│   ├── prompts/                # Gemini instructions and prompt builders
+│   ├── orchestrator/           # State machine and schema validation
+│   ├── data/                   # Route graph, vessel, chokepoint taxonomy
+│   ├── storage/                # Local persisted runs and event logs
+│   ├── config.py               # Gemini environment configuration
+│   └── main.py                 # FastAPI REST/SSE endpoints
+├── frontend/
+│   ├── src/components/         # Map, pipeline, advisory, history, route UI
+│   ├── src/lib/                # API client, SSE hook, route presentation
+│   ├── src/Dashboard.jsx       # Main operator dashboard
+│   └── package.json            # Vite scripts and dependencies
+├── schemas/                    # Shared JSON pipeline contracts
+├── tests/                      # Backend agent/orchestrator tests
+├── SPEC.md                     # Product source of truth
+└── README.md
+```
+
+## How to run locally
+
+### Prerequisites
+
+- Python 3.10 or newer
+- Node.js `^20.19.0` or `>=22.12.0` (required by the installed Vite version)
+- npm
+- a Google Gemini API key
+- internet access for article retrieval, Gemini calls, and map tiles
+
+Docker and a database are not required.
+
+### Environment variables
+
+Copy the checked-in backend example:
 
 ```bash
-cd backend
+cp backend/.env.example backend/.env
+```
+
+Then set:
+
+```env
+GEMINI_API_KEY=your_api_key
+GEMINI_MODEL=gemini-3.6-flash
+```
+
+`GEMINI_API_KEY` is required. `GEMINI_MODEL` is optional but, when supplied, must name a Gemini Flash model. The backend reads `backend/.env` directly.
+
+The frontend defaults to `http://localhost:8000`. To use another backend URL, create `frontend/.env.local`:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000
+```
+
+### Backend
+
+Run from the repository root:
+
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
-cp .env.example .env
-uvicorn app.main:app --reload
+python -m pip install -r backend/requirements.txt
+uvicorn backend.main:app --reload
 ```
 
-Set `SUPABASE_URL`, the server-only `SUPABASE_SERVICE_ROLE_KEY`, and
-`OPENAI_API_KEY` in `backend/.env` before using live article processing. The
-optional `OPENAI_MODEL`, `OPENAI_TIMEOUT_SECONDS`, and `EVENT_MATCH_THRESHOLD`
-settings have local defaults shown in `.env.example`. Never expose either
-server-side key to the frontend.
+The API runs at `http://localhost:8000`; FastAPI documentation is at `http://localhost:8000/docs`.
 
-To create and seed the current database slice, run these files in the Supabase
-SQL Editor in order:
+### Frontend
 
-1. `backend/supabase/migrations/001_create_events.sql`
-2. `backend/supabase/migrations/002_create_articles_developments_and_replay.sql`
-3. `backend/supabase/migrations/003_create_global_watch_intelligence.sql`
-4. `backend/supabase/seed.sql`
-
-The seed resets the four demo replays and creates or refreshes synthetic event
-`EVT-001`.
-
-With the backend running, inspect and replay the deterministic demo sequence:
-
-```bash
-curl http://localhost:8000/api/v1/demo/articles
-curl -X POST http://localhost:8000/api/v1/demo/replay/red-sea-01
-curl http://localhost:8000/api/v1/events/EVT-001/developments
-```
-
-Replay `red-sea-01` a second time to verify the documented `409 Conflict`
-response. Continue with `red-sea-02`, `red-sea-03`, and `red-sea-04` to apply
-the complete synthetic confidence progression.
-
-Process a live or manually supplied article through the Global Watch Agent:
-
-```bash
-curl -X POST http://localhost:8000/api/v1/articles/process \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "title": "Carrier suspends Red Sea transit",
-    "content": "A shipping carrier announced temporary rerouting away from the Red Sea.",
-    "sourceName": "Example Carrier Bulletin",
-    "sourceType": "CARRIER_ADVISORY",
-    "url": null,
-    "publishedAt": "2026-08-24T08:00:00Z",
-    "isSynthetic": true
-  }'
-```
-
-Inspect the Global Watch processing trace with:
-
-```bash
-curl 'http://localhost:8000/api/v1/activity?agent=GLOBAL_WATCH'
-```
-
-The Global Watch MVP keeps final decisions deterministic:
-
-- an AI match suggestion is accepted only at or above
-  `EVENT_MATCH_THRESHOLD` and only when event type and normalized location match
-- initial confidence comes from a fixed source-type table; an update adds `0.14`
-  for a new independent source or `0.06` for a repeated source, capped at `0.95`
-- severity comes from a fixed event-type table and never decreases on an update
-
-These values are application rules, not model-generated confidence or severity.
-
-The API is available at `http://127.0.0.1:8000`. Run the backend tests from
-the `backend` directory with:
-
-```bash
-pytest
-```
-
-## Run the Frontend Locally
-
-In a second terminal, from the repository root:
+In a second terminal:
 
 ```bash
 cd frontend
-cp .env.example .env.local
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. The local frontend expects the FastAPI backend at
-`http://localhost:8000`; change `NEXT_PUBLIC_API_BASE_URL` in `.env.local` if the
-backend is running elsewhere.
+Open `http://localhost:5173`.
 
-Run frontend checks from the `frontend` directory:
+### Run the tests
+
+From the repository root with the Python environment activated:
 
 ```bash
-npm run lint
+python -m pytest -q
+```
+
+From `frontend/`:
+
+```bash
+npm test
 npm run build
 ```
+
+The frontend package does not currently define a lint script.
+
+## API summary
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/runs` | Create a run and start the pipeline in a background task |
+| `GET` | `/runs/{run_id}` | Read accumulated run state |
+| `GET` | `/runs/{run_id}/stream` | Stream status changes over SSE |
+| `GET` | `/runs/{run_id}/events` | Read the run's audit events |
+| `POST` | `/runs/{run_id}/article-text` | Resume an extraction-blocked run with manual text |
+| `POST` | `/runs/{run_id}/decision` | Persist Accept/Dismiss and an optional comment |
+| `GET` | `/runs` | List run summaries for History |
+| `GET` | `/routes` | Read the deterministic route graph |
+| `GET` | `/vessel` | Read the mocked vessel and schedule |
+
+## Demo walkthrough
+
+1. Open PSA Sentinel and introduce MV Pacific Voyager's scheduled Rotterdam → Suez → Bab el-Mandeb → Singapore baseline.
+2. Paste a maritime-news URL about unsafe or disrupted Bab el-Mandeb / Red Sea transit.
+3. Click **Start assessment** and point out the live five-agent status rail.
+4. Explain that Agent 1 extracts article-backed facts and decides relevance.
+5. Show Agent 2 identifying Bab el-Mandeb risk, severity, probability, and duration.
+6. Emphasise that Agent 3 retrieves `RT-002-CAPE-BYPASS` from static route knowledge—it does not generate a route.
+7. Show Agent 4 selecting and highlighting the rank-1 route and calculating the revised ETA and `+10 days` for this demo data.
+8. Read Agent 5's terminal-side actions and connect them to berth, resources, yard, and transshipment planning.
+9. Accept or dismiss the advisory with a comment, then show the persisted decision in History and the event log.
+
+## Presentation cheat sheet
+
+### 30-second pitch
+
+PSA Sentinel turns external maritime disruption news into operational foresight for PSA. Five specialised agents verify relevance, assess chokepoint risk, retrieve only predefined maritime routes, calculate ETA impact, and recommend terminal-side actions. The result is explainable and auditable: operators can see what came from the article, what was calculated, and why a recommendation was made—while the human remains in control.
+
+### What makes it different?
+
+- It connects news to route exposure, schedule impact, and terminal action—not just a summary.
+- Route retrieval is deterministic, so the model cannot hallucinate shipping paths.
+- ETA, ranks, and scores are calculated before Gemini writes an explanation.
+- Every stage has a validated contract and visible audit trail.
+- PSA receives decision support; vessel navigation remains with the carrier and vessel operator.
+
+### Key line to remember
+
+> **PSA Sentinel does not decide how the vessel sails. It tells PSA how a global maritime disruption may affect the terminal and what operations need to change.**
+
+### If judges ask: “Why five agents?”
+
+Each stage has a different job and failure mode. Separating extraction, risk assessment, route retrieval, numerical impact, and advice makes intermediate results testable, schema-validatable, auditable, and easier to diagnose. It also lets route retrieval and ETA calculation remain deterministic.
+
+### If judges ask: “Why not one Gemini prompt?”
+
+One prompt would mix evidence extraction, risk judgement, route invention, calculations, and recommendations. The pipeline validates each hand-off, uses deterministic code where correctness matters, and reduces the chance that fluent text hides an unsupported route or number.
+
+### If judges ask: “Is the route real-time?”
+
+No. The MVP uses a predefined two-route graph and one mocked vessel schedule. Map geometry is static and illustrative. A production version could connect the same agent contracts to AIS, carrier schedule, network, weather, and port intelligence feeds.
+
+## Current limitations and future work
+
+Current MVP limitations:
+
+- one Rotterdam → PSA Singapore corridor and one mocked vessel;
+- a predefined two-route graph rather than a live carrier network;
+- simplified ETA based on fixed base transit days, without weather, congestion, speed, or port-call modelling;
+- no live AIS or carrier schedule integration;
+- article extraction can fail on paywalls or inaccessible pages;
+- manual-text recovery exists in the API but not yet in the dashboard;
+- the optional operator note is submitted by the UI but is not yet used or persisted by the orchestrator;
+- local JSON persistence is suitable for a demo, not concurrent production workloads;
+- route polylines are illustrative rather than navigation-grade; and
+- no automatic terminal-planning or carrier-system integration.
+
+Credible next steps include AIS and carrier schedule feeds, weather and port-strike intelligence, a richer validated route network, durable database-backed audit storage, manual-text recovery in the UI, authentication/roles, and integrations with berth, yard, workforce, and transshipment planning systems.
