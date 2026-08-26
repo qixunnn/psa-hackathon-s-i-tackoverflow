@@ -28,6 +28,7 @@ export default function Dashboard() {
   const [recentRuns, setRecentRuns] = useState([])
   const [viewMode, setViewMode] = useState('2D')
   const [view, setView] = useState('home')
+  const [assessmentStarting, setAssessmentStarting] = useState(false)
   const { status, run, events, isLoading } = useRunStream(runId)
   const selectedRoute = selectedRouteFromState(run, routes, vessel)
   const operationalRoutes = useMemo(
@@ -35,7 +36,11 @@ export default function Dashboard() {
     [routes, vessel, run?.candidate_routes],
   )
   const riskScenario = riskScenarioFromState(run)
-  const pipelineLabel = !runId ? 'READY' : status === 'complete' ? 'COMPLETE' : status === 'halted_not_relevant' ? 'NO IMPACT' : status === 'error' ? 'ERROR' : 'RUNNING'
+  const pipelineLabel = assessmentStarting ? 'RUNNING' : !runId ? 'READY' : status === 'complete' ? 'COMPLETE' : status === 'halted_not_relevant' ? 'NO IMPACT' : status === 'error' ? 'ERROR' : 'RUNNING'
+  const runActive = assessmentStarting || Boolean(runId && !['complete', 'halted_not_relevant', 'error'].includes(status))
+  const pipelineRun = assessmentStarting && (!run || run.status === 'queued')
+    ? { ...run, status: 'extracting' }
+    : run
 
   const refreshRuns = useCallback(() => { listRuns().then(setRecentRuns).catch(() => {}) }, [])
 
@@ -46,15 +51,34 @@ export default function Dashboard() {
 
   useEffect(() => { getVessel().then(setVessel).catch(() => {}) }, [])
 
+  useEffect(() => {
+    if (run && run.status !== 'queued') setAssessmentStarting(false)
+  }, [run])
+
   function openRun(nextRunId) {
     setRunId(nextRunId)
     setView('home')
   }
 
   function beginNewScan() {
+    if (runActive) return
     setRunId(null)
     setView('home')
     requestAnimationFrame(() => document.querySelector('[aria-label="Article URL"]')?.focus())
+  }
+
+  function startAssessment() {
+    setRunId(null)
+    setAssessmentStarting(true)
+    setView('home')
+  }
+
+  function assessmentCreated(nextRunId) {
+    setRunId(nextRunId)
+  }
+
+  function assessmentStartFailed() {
+    setAssessmentStarting(false)
   }
 
   return <main className="command-shell">
@@ -73,7 +97,7 @@ export default function Dashboard() {
       </div>
       <div className="header-actions">
         <button className="control-button quiet"><Radio size={14} /> Pipeline live</button>
-        <button className="control-button" onClick={beginNewScan}><RefreshCw size={14} /> New scan</button>
+        <button className="control-button" onClick={beginNewScan} disabled={runActive}><RefreshCw size={14} /> New scan</button>
         <div className="view-switch">
           {['2D', '3D'].map((mode) => <button key={mode} className={viewMode === mode ? 'selected' : ''} onClick={() => setViewMode(mode)}>{mode === '2D' ? <Map size={14} /> : <Globe2 size={14} />}{mode}</button>)}
         </div>
@@ -102,7 +126,7 @@ export default function Dashboard() {
           <div className="scenario-list"><div className={`scenario ${riskScenario.active ? 'critical' : ''}`}><span>{riskScenario.title}</span><small>{riskScenario.severity}</small></div></div>
           <div className="scenario-detail"><span>Chokepoint</span><b>{riskScenario.chokepoint}</b><span>Probability</span><b>{riskScenario.probability}</b><span>Duration</span><b>{riskScenario.duration}</b></div>
         </aside>
-        <div className="scan-dock"><UrlSubmitForm onRunCreated={setRunId} /></div>
+        <div className="scan-dock"><UrlSubmitForm onRunStarting={startAssessment} onRunCreated={assessmentCreated} onRunStartFailed={assessmentStartFailed} isRunActive={runActive} /></div>
         <section className="bottom-console">
           <RiskTrendStrip runs={recentRuns} activeRun={run} />
           <EventLog events={events} />
@@ -113,7 +137,7 @@ export default function Dashboard() {
         <div className="rail-head"><div><span className="eyebrow">Human-in-the-loop</span><h1>Agent Activity & Decisions</h1></div><span className="live-badge"><i /> {pipelineLabel}</span></div>
         <section className="run-context-card"><span className="eyebrow">Current assessment</span>{run ? <><strong>{run.event?.entities?.event_type || 'Analysing submitted article'}</strong><p>{run.event?.summary || 'The pipeline is extracting maritime relevance and event entities.'}</p><div><span>Source</span><b>{new URL(run.source_url).hostname}</b><span>Severity</span><b>{run.risk_assessment?.severity || 'Pending'}</b><span>Probability</span><b>{run.risk_assessment ? `${Math.round(run.risk_assessment.probability * 100)}%` : 'Pending'}</b></div></> : <p>Submit one article URL. The five-agent pipeline will assess its relevance to MV Pacific Voyager and the Rotterdam–Singapore corridor.</p>}</section>
         {runId && <div className="active-run-strip"><span>RUN {runId.slice(0, 8)}</span><b className={`status-${status}`}>{isLoading ? 'UPDATING' : status?.replaceAll('_', ' ')}</b></div>}
-        <AgentPipelineRail run={run} />
+        <AgentPipelineRail run={pipelineRun} />
         <AdvisoryCard run={run} onDecided={refreshRuns} />
         <RouteComparisonPanel run={run} routes={routes} />
       </aside>

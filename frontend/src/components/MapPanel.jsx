@@ -3,9 +3,22 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { formatEta, formatEtaDelta, graphAffectedChokepoints, routeLayerStyle, routeName } from '../lib/routePresentation'
 
+// MapLibre consumes GeoJSON positions as [longitude, latitude]. These values
+// are passed directly to the LineString below; no coordinate transform occurs.
 const ROUTE_COORDINATES = {
-  'RT-001-BASELINE': [[4.48,51.92],[3.2,51.4],[1,50.9],[-5,48.5],[-9,44],[-10,37],[-5.6,36],[2,37],[12,35],[20,33],[29.9,31.2],[32.55,29.95],[34,25],[38,18],[43.3,12.6],[50,10],[60,5],[72,6],[85,6],[94.8,6.4],[99.65,5.55],[103.82,1.26]],
-  'RT-002-CAPE-BYPASS': [[4.48,51.92],[3.2,51.4],[1,50.9],[-5,48.5],[-9,44],[-10,37],[-17,30],[-17,15],[-5,2],[8,-15],[18.5,-34.8],[30,-32],[45,-20],[60,-10],[75,-2],[90,5],[99.65,5.55],[103.82,1.26]],
+  'RT-001-BASELINE': [
+    [4.48,51.92],[3.2,51.4],[1,50.9],[-5,48.5],[-9,44],[-10,37],[-5.6,36],
+    [2,37],[12,35],[20,33],[29.9,31.2],[32.55,29.95],[34,25],[38,18],
+    [43.3,12.6],[46,11],[52,10],[60,8],[68,6],[76,3],[82,2.5],[88,4],
+    [94,5],[96,5.7],[99.65,5.55],[101.3,3.15],[103.82,1.26],
+  ],
+  'RT-002-CAPE-BYPASS': [
+    [4.48,51.92],[3.2,51.4],[1,50.9],[-5,48.5],[-9.5,44],[-10.5,36],
+    [-15,28],[-18,20],[-17,10],[-10,2],[-2,-5],[5,-12],[10,-20],[14,-28],
+    [17,-34],[19,-36.5],[25,-36],[32,-34],[43,-38],[55,-32],[60,-25],
+    [65,-15],[72,-8],[78,-3],[82,2],[88,3.5],[94,5],[96,5.7],
+    [99.65,5.55],[101.3,3.15],[103.82,1.26],
+  ],
 }
 const ROUTE_COLORS = {'RT-001-BASELINE':'#62c3b0','RT-002-CAPE-BYPASS':'#e3a45b'}
 function routeFeature(route) {
@@ -48,7 +61,7 @@ export default function MapPanel({ run, routes=[], vessel=null, selectedRoute=nu
       makeMarker(map,[18.5,-34.8],'CAPE OF GOOD HOPE','waypoint')
       makeMarker(map,[99.65,5.55],'STRAIT OF MALACCA','chokepoint')
       makeMarker(map,[103.82,1.26],'PSA SINGAPORE','destination')
-      map.fitBounds([[-22,-40],[108,56]], { padding:{top:55,right:55,bottom:65,left:55}, duration:0 })
+      map.fitBounds([[-19,-39],[105,53]], { padding:{top:48,right:48,bottom:55,left:48}, duration:0 })
     })
     return () => { map.remove(); mapInstance.current=null }
   }, [routes])

@@ -18,15 +18,24 @@ beforeEach(() => vi.clearAllMocks())
 describe('UrlSubmitForm', () => {
   it('submits entered values and disables while pending', async () => {
     let resolveRequest
+    const onRunStarting = vi.fn()
     submitRun.mockReturnValue(new Promise((resolve) => { resolveRequest = resolve }))
-    render(<UrlSubmitForm onRunCreated={vi.fn()} />)
+    render(<UrlSubmitForm onRunStarting={onRunStarting} onRunCreated={vi.fn()} />)
     fireEvent.change(screen.getByLabelText('Article URL'), { target: { value: 'https://example.com/story' } })
     fireEvent.change(screen.getByLabelText('Operator note'), { target: { value: 'Watch closely' } })
     fireEvent.click(screen.getByRole('button', { name: 'Start assessment' }))
+    expect(onRunStarting).toHaveBeenCalledOnce()
     expect(submitRun).toHaveBeenCalledWith('https://example.com/story', 'Watch closely')
     expect(screen.getByRole('button', { name: 'Submitting...' })).toBeDisabled()
     resolveRequest({ run_id: 'run-1' })
     await waitFor(() => expect(screen.getByRole('button', { name: 'Start assessment' })).toBeEnabled())
+    expect(screen.getByLabelText('Article URL')).toHaveValue('https://example.com/story')
+  })
+
+  it('stays disabled while the created assessment is active', () => {
+    render(<UrlSubmitForm onRunCreated={vi.fn()} isRunActive />)
+    expect(screen.getByRole('button', { name: 'Assessment running' })).toBeDisabled()
+    expect(screen.getByLabelText('Article URL')).toBeDisabled()
   })
 })
 
@@ -44,6 +53,13 @@ describe('AgentPipelineRail', () => {
     expect(screen.getByText('Relevance & Extraction').nextElementSibling).toHaveTextContent('queued')
     expect(screen.getByText('Risk & Severity').nextElementSibling).toHaveTextContent('waiting')
     expect(screen.queryByText('running')).not.toBeInTheDocument()
+  })
+
+  it('shows Agent 1 running as soon as extraction starts', () => {
+    render(<AgentPipelineRail run={{ status: 'extracting' }} />)
+    expect(screen.getByText('Relevance & Extraction').nextElementSibling).toHaveTextContent('running')
+    expect(screen.getByText('Risk & Severity').nextElementSibling).toHaveTextContent('queued')
+    expect(screen.getByText('Route Retrieval').nextElementSibling).toHaveTextContent('queued')
   })
 
   it('derives done, running, and queued statuses from accumulated run data', () => {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { submitRun } from '../lib/api'
 
-export default function UrlSubmitForm({ onRunCreated }) {
+export default function UrlSubmitForm({ onRunStarting, onRunCreated, onRunStartFailed, isRunActive = false }) {
   const [sourceUrl, setSourceUrl] = useState('')
   const [note, setNote] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -11,13 +11,13 @@ export default function UrlSubmitForm({ onRunCreated }) {
     event.preventDefault()
     setIsSubmitting(true)
     setError('')
+    onRunStarting?.()
     try {
       const result = await submitRun(sourceUrl, note)
       onRunCreated(result.run_id)
-      setSourceUrl('')
-      setNote('')
     } catch (requestError) {
       setError(requestError.message)
+      onRunStartFailed?.()
     } finally {
       setIsSubmitting(false)
     }
@@ -31,13 +31,13 @@ export default function UrlSubmitForm({ onRunCreated }) {
       </div>
       <label>
         Article URL
-        <input aria-label="Article URL" type="url" required value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://newsroom.example/article" disabled={isSubmitting} />
+        <input aria-label="Article URL" type="url" required value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://newsroom.example/article" disabled={isSubmitting || isRunActive} />
       </label>
       <label>
         Operator note <span>(optional)</span>
-        <textarea aria-label="Operator note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Context from the duty desk" rows="1" disabled={isSubmitting} />
+        <textarea aria-label="Operator note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Context from the duty desk" rows="1" disabled={isSubmitting || isRunActive} />
       </label>
-      <button className="primary-button" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Start assessment'}</button>
+      <button className="primary-button" type="submit" disabled={isSubmitting || isRunActive}>{isSubmitting ? 'Submitting...' : isRunActive ? 'Assessment running' : 'Start assessment'}</button>
       {error && <p className="form-error">{error}</p>}
     </form>
   )
