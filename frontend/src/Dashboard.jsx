@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Activity, ChevronDown, Globe2, History, Home, Layers3, Map, Radio, RefreshCw, ShieldCheck, Waypoints, X,
 } from 'lucide-react'
@@ -12,7 +12,7 @@ import RiskTrendStrip from './components/RiskTrendStrip'
 import RouteComparisonPanel from './components/RouteComparisonPanel'
 import RouteGraphViewer from './components/RouteGraphViewer'
 import { getRoutes, getVessel, listRuns } from './lib/api'
-import { formatEtaDelta, routeName, selectedRouteFromState } from './lib/routePresentation'
+import { formatEtaDelta, operationalRoutesFromState, riskScenarioFromState, routeName, selectedRouteFromState } from './lib/routePresentation'
 import { useRunStream } from './lib/useRunStream'
 
 const NAV = [
@@ -30,8 +30,12 @@ export default function Dashboard() {
   const [view, setView] = useState('home')
   const { status, run, events, isLoading } = useRunStream(runId)
   const selectedRoute = selectedRouteFromState(run, routes, vessel)
-  const affectedChokepoints = run?.risk_assessment?.affected_chokepoints || []
-  const hormuzRiskActive = affectedChokepoints.includes('Strait of Hormuz')
+  const operationalRoutes = useMemo(
+    () => operationalRoutesFromState(routes, vessel, run),
+    [routes, vessel, run?.candidate_routes],
+  )
+  const riskScenario = riskScenarioFromState(run)
+  const pipelineLabel = !runId ? 'READY' : status === 'complete' ? 'COMPLETE' : status === 'halted_not_relevant' ? 'NO IMPACT' : status === 'error' ? 'ERROR' : 'RUNNING'
 
   const refreshRuns = useCallback(() => { listRuns().then(setRecentRuns).catch(() => {}) }, [])
 
@@ -45,6 +49,12 @@ export default function Dashboard() {
   function openRun(nextRunId) {
     setRunId(nextRunId)
     setView('home')
+  }
+
+  function beginNewScan() {
+    setRunId(null)
+    setView('home')
+    requestAnimationFrame(() => document.querySelector('[aria-label="Article URL"]')?.focus())
   }
 
   return <main className="command-shell">
@@ -63,7 +73,7 @@ export default function Dashboard() {
       </div>
       <div className="header-actions">
         <button className="control-button quiet"><Radio size={14} /> Pipeline live</button>
-        <button className="control-button" onClick={() => document.querySelector('[aria-label="Article URL"]')?.focus()}><RefreshCw size={14} /> New scan</button>
+        <button className="control-button" onClick={beginNewScan}><RefreshCw size={14} /> New scan</button>
         <div className="view-switch">
           {['2D', '3D'].map((mode) => <button key={mode} className={viewMode === mode ? 'selected' : ''} onClick={() => setViewMode(mode)}>{mode === '2D' ? <Map size={14} /> : <Globe2 size={14} />}{mode}</button>)}
         </div>
@@ -73,24 +83,24 @@ export default function Dashboard() {
 
     <div className="command-layout">
       <section className="operations-canvas">
-        <MapPanel run={run} routes={routes} vessel={vessel} selectedRoute={selectedRoute} viewMode={viewMode} />
+        <MapPanel run={run} routes={operationalRoutes} vessel={vessel} selectedRoute={selectedRoute} viewMode={viewMode} />
         <aside className="map-controls floating-panel">
           <div className="floating-title"><span><Layers3 size={15} /> Map controls</span><ChevronDown size={14} /></div>
           <div className="control-content">
             <div className="control-card-heading"><strong>MVP corridor</strong><span>LIVE</span></div>
-            <dl className="map-stat-grid"><div><dt>Graph routes</dt><dd>{routes.length || 3}</dd></div><div><dt>Ports</dt><dd>2</dd></div><div><dt>Active vessels</dt><dd>1</dd></div><div><dt>View</dt><dd>{viewMode} map</dd></div></dl>
-            <div className="corridor-copy"><b>Jebel Ali</b><span>→</span><b>PSA Singapore</b></div>
-            <div className="legend"><strong>Route graph</strong>{routes.map((route) => {
+            <dl className="map-stat-grid"><div><dt>Visible routes</dt><dd>{operationalRoutes.length}</dd></div><div><dt>Ports</dt><dd>2</dd></div><div><dt>Active vessels</dt><dd>1</dd></div><div><dt>View</dt><dd>{viewMode} map</dd></div></dl>
+            <div className="corridor-copy"><b>Rotterdam</b><span>→</span><b>PSA Singapore</b></div>
+            <div className="legend"><strong>Operational routes</strong>{operationalRoutes.map((route) => {
               const isSelected = route.route_id === selectedRoute?.route_id
-              const routeClass = route.route_id === 'RT-001-BASELINE' ? 'baseline' : route.route_id === 'RT-002-FUJAIRAH-BYPASS' ? 'bypass' : 'escorted'
-              return <span className={`legend-route ${isSelected ? 'selected' : 'muted'}`} key={route.route_id}><i className={`legend-line ${routeClass}`} /><span>{routeName(route.route_id)} · {route.distance_nm.toLocaleString()} nm</span>{isSelected && <em>SELECTED · {formatEtaDelta(selectedRoute.eta_delta_days)}</em>}</span>
-            })}<span><i className="legend-box risk" /> Hormuz risk zone</span></div>
+              const routeClass = route.route_id === 'RT-001-BASELINE' ? 'baseline' : 'cape'
+              return <span className={`legend-route ${isSelected ? 'selected' : 'muted'}`} key={route.route_id}><i className={`legend-line ${routeClass}`} /><span>{routeName(route.route_id)} · {route.distance_nm.toLocaleString()} nm</span>{isSelected && <em>{selectedRoute.is_scheduled_fallback ? 'SCHEDULED' : 'SELECTED'} · {formatEtaDelta(selectedRoute.eta_delta_days)}</em>}</span>
+            })}{riskScenario.active && <span><i className="legend-box risk" /> {riskScenario.chokepoint === '—' ? 'No route chokepoint identified' : `${riskScenario.chokepoint} risk`}</span>}</div>
           </div>
         </aside>
         <aside className="scenario-panel floating-panel">
-          <div className="floating-title"><span><Activity size={15} /> Risk scenario</span><span className="alert-count">{hormuzRiskActive ? 'ACTIVE' : 'STANDBY'}</span></div>
-          <div className="scenario-list"><div className={`scenario ${hormuzRiskActive ? 'critical' : ''}`}><span>Hormuz tension</span><small>{hormuzRiskActive ? run.risk_assessment.severity : 'AWAITING'}</small></div></div>
-          <div className="scenario-detail"><span>Chokepoint</span><b>Strait of Hormuz</b><span>Probability</span><b>{hormuzRiskActive ? `${Math.round(run.risk_assessment.probability * 100)}%` : 'Awaiting scan'}</b><span>Duration</span><b>{hormuzRiskActive ? run.risk_assessment.estimated_duration : 'Awaiting scan'}</b></div>
+          <div className="floating-title"><span><Activity size={15} /> Risk scenario</span><span className="alert-count">{riskScenario.active ? 'ACTIVE' : 'STANDBY'}</span></div>
+          <div className="scenario-list"><div className={`scenario ${riskScenario.active ? 'critical' : ''}`}><span>{riskScenario.title}</span><small>{riskScenario.severity}</small></div></div>
+          <div className="scenario-detail"><span>Chokepoint</span><b>{riskScenario.chokepoint}</b><span>Probability</span><b>{riskScenario.probability}</b><span>Duration</span><b>{riskScenario.duration}</b></div>
         </aside>
         <div className="scan-dock"><UrlSubmitForm onRunCreated={setRunId} /></div>
         <section className="bottom-console">
@@ -100,8 +110,8 @@ export default function Dashboard() {
       </section>
 
       <aside className="intelligence-rail">
-        <div className="rail-head"><div><span className="eyebrow">Human-in-the-loop</span><h1>Agent Activity & Decisions</h1></div><span className="live-badge"><i /> {runId ? 'RUNNING' : 'READY'}</span></div>
-        <section className="run-context-card"><span className="eyebrow">Current assessment</span>{run ? <><strong>{run.event?.entities?.event_type || 'Analysing submitted article'}</strong><p>{run.event?.summary || 'The pipeline is extracting maritime relevance and event entities.'}</p><div><span>Source</span><b>{new URL(run.source_url).hostname}</b><span>Severity</span><b>{run.risk_assessment?.severity || 'Pending'}</b><span>Probability</span><b>{run.risk_assessment ? `${Math.round(run.risk_assessment.probability * 100)}%` : 'Pending'}</b></div></> : <p>Submit one article URL. The five-agent pipeline will assess its relevance to MV Pacific Voyager and the Jebel Ali–Singapore corridor.</p>}</section>
+        <div className="rail-head"><div><span className="eyebrow">Human-in-the-loop</span><h1>Agent Activity & Decisions</h1></div><span className="live-badge"><i /> {pipelineLabel}</span></div>
+        <section className="run-context-card"><span className="eyebrow">Current assessment</span>{run ? <><strong>{run.event?.entities?.event_type || 'Analysing submitted article'}</strong><p>{run.event?.summary || 'The pipeline is extracting maritime relevance and event entities.'}</p><div><span>Source</span><b>{new URL(run.source_url).hostname}</b><span>Severity</span><b>{run.risk_assessment?.severity || 'Pending'}</b><span>Probability</span><b>{run.risk_assessment ? `${Math.round(run.risk_assessment.probability * 100)}%` : 'Pending'}</b></div></> : <p>Submit one article URL. The five-agent pipeline will assess its relevance to MV Pacific Voyager and the Rotterdam–Singapore corridor.</p>}</section>
         {runId && <div className="active-run-strip"><span>RUN {runId.slice(0, 8)}</span><b className={`status-${status}`}>{isLoading ? 'UPDATING' : status?.replaceAll('_', ' ')}</b></div>}
         <AgentPipelineRail run={run} />
         <AdvisoryCard run={run} onDecided={refreshRuns} />

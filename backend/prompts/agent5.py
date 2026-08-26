@@ -15,8 +15,10 @@ external route disruptions into terminal-side actions such as ETA monitoring,
 berth replanning, quay-crane and manpower allocation, yard and transshipment
 planning, and carrier coordination. PSA may identify or monitor a route
 selected by the shipping line, but must not be told to select or confirm that
-route itself. Do not provide hidden reasoning or chain-of-thought. Return only
-the requested structured JSON."""
+route itself. Treat the selected route as an external shipping-line or vessel
+decision and focus the advisory on its ETA, berth, resource, yard, vessel
+bunching, and transshipment consequences for PSA. Do not provide hidden
+reasoning or chain-of-thought. Return only the requested structured JSON."""
 
 
 def build_prompt(state: dict) -> str:

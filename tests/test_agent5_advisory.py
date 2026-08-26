@@ -43,13 +43,13 @@ def valid_state():
             "relevant": True,
             "confidence": 0.91,
             "relevance_rationale": "The article affects PSA-bound maritime shipping.",
-            "summary": "A carrier suspended transit through the Strait of Hormuz.",
+            "summary": "Sustained attacks made Bab el-Mandeb unsafe for commercial transit.",
             "entities": {
-                "location": "Strait of Hormuz",
+                "location": "Bab el-Mandeb",
                 "event_type": "maritime disruption",
                 "date": "2026-08-25",
                 "actors": ["Carrier"],
-                "chokepoints_mentioned": ["Strait of Hormuz"],
+                "chokepoints_mentioned": ["Bab el-Mandeb"],
             },
             "evidence": ["Transit through the strait was temporarily suspended."],
             "source_url": "https://example.com/article",
@@ -60,7 +60,7 @@ def valid_state():
             "severity": "High",
             "confidence": 0.87,
             "probability": 0.72,
-            "affected_chokepoints": ["Strait of Hormuz"],
+            "affected_chokepoints": ["Bab el-Mandeb"],
             "estimated_duration": "3-5 days",
             "rationale": "The event may materially disrupt transit.",
             "evidence": ["Transit through the strait was temporarily suspended."],
@@ -70,17 +70,22 @@ def valid_state():
                 "run_id": "run-5",
                 "route_id": "RT-001-BASELINE",
                 "retrieved_reason": "Baseline route retained for comparison.",
-            }
+            },
+            {
+                "run_id": "run-5",
+                "route_id": "RT-002-CAPE-BYPASS",
+                "retrieved_reason": "Avoids the affected chokepoint.",
+            },
         ],
         "ranked_routes": [
             {
                 "run_id": "run-5",
-                "route_id": "RT-002-FUJAIRAH-BYPASS",
+                "route_id": "RT-002-CAPE-BYPASS",
                 "rank": 1,
                 "score": 0.83,
-                "eta": "2026-09-06T00:00:00Z",
-                "eta_delta_days": 2,
-                "rationale": "Avoids Hormuz with a two-day ETA impact.",
+                "eta": "2026-09-30T16:26:26Z",
+                "eta_delta_days": 10,
+                "rationale": "Avoids Bab el-Mandeb with a ten-day ETA impact.",
             }
         ],
     }
@@ -88,11 +93,11 @@ def valid_state():
 
 def advisory_payload():
     return {
-        "headline": "Prepare for possible Hormuz-driven delay",
-        "summary": "A validated Strait of Hormuz disruption may shift the PSA-bound vessel by about two days.",
+        "headline": "Prepare for Cape-route arrival delay",
+        "summary": "The Bab el-Mandeb disruption shifts the PSA-bound vessel to the Cape route, delaying arrival by ten days.",
         "recommended_actions": [
             "Review berth and yard allocation",
-            "Notify transshipment partners of the watch status",
+            "Coordinate revised port-call timing with the shipping line",
         ],
     }
 
@@ -107,12 +112,13 @@ def test_agent5_generates_valid_advisory_from_gemini_fields():
     assert advisory["operator_decision"] == "pending"
     assert advisory["operator_comment"] is None
     assert advisory["confidence"] == 0.83
-    assert advisory["headline"] == "Prepare for possible Hormuz-driven delay"
+    assert advisory["headline"] == "Prepare for Cape-route arrival delay"
     assert models.calls[0]["config"]["response_mime_type"] == "application/json"
     system_instruction = " ".join(models.calls[0]["config"]["system_instruction"].split())
     assert "PSA's operational control" in system_instruction
     assert "alter vessel navigation, routing, vessel speed" in system_instruction
     assert "PSA may identify or monitor a route selected by the shipping line" in system_instruction
+    assert "Treat the selected route as an external shipping-line or vessel decision" in system_instruction
     assert "ranked_routes" in models.calls[0]["contents"]
 
 

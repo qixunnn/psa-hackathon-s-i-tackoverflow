@@ -2,24 +2,28 @@ import { useEffect, useState } from 'react'
 import { API_BASE_URL, getRun, getRunEvents } from './api'
 
 const TERMINAL_STATUSES = new Set(['complete', 'halted_not_relevant', 'error'])
+const EMPTY_STATE = { runId: null, status: null, run: null, events: [], isLoading: false }
 
 export function useRunStream(runId) {
-  const [state, setState] = useState({ status: null, run: null, events: [], isLoading: false })
+  const [state, setState] = useState(EMPTY_STATE)
 
   useEffect(() => {
     if (!runId) {
-      setState({ status: null, run: null, events: [], isLoading: false })
+      setState(EMPTY_STATE)
       return undefined
     }
 
     let closed = false
     let source
+    setState({ ...EMPTY_STATE, runId, isLoading: true })
     const refresh = async (statusHint) => {
-      setState((current) => ({ ...current, isLoading: true, status: statusHint || current.status }))
+      setState((current) => current.runId === runId
+        ? { ...current, isLoading: true, status: statusHint || current.status }
+        : current)
       try {
         const [run, events] = await Promise.all([getRun(runId), getRunEvents(runId)])
         if (!closed) {
-          setState({ status: run.status, run, events, isLoading: false })
+          setState({ runId, status: run.status, run, events, isLoading: false })
           if (TERMINAL_STATUSES.has(run.status)) source?.close()
         }
       } catch {
@@ -37,11 +41,11 @@ export function useRunStream(runId) {
         status = undefined
       }
       if (status) {
-        setState((current) => ({
+        setState((current) => current.runId === runId ? ({
           ...current,
           status,
           run: current.run ? { ...current.run, status } : current.run,
-        }))
+        }) : current)
       }
       refresh(status)
       if (TERMINAL_STATUSES.has(status)) source.close()
@@ -56,5 +60,7 @@ export function useRunStream(runId) {
     }
   }, [runId])
 
-  return state
+  return state.runId === runId
+    ? state
+    : { ...EMPTY_STATE, runId, isLoading: Boolean(runId) }
 }

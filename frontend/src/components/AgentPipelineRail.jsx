@@ -6,7 +6,6 @@ const AGENTS = [
   ['Advisory & Recommendation', 'advisory'],
 ]
 
-const RUNNING_STATES = ['extracting', 'assessing_risk', 'retrieving_routes', 'ranking', 'advising']
 const STATUS_AGENT_INDEX = {
   extracting: 0,
   awaiting_manual_text: 0,
@@ -17,6 +16,7 @@ const STATUS_AGENT_INDEX = {
 }
 
 function getAgentStatus(run, field, index) {
+  if (!run) return index === 0 ? 'idle' : 'waiting'
   if (run?.[field]) return 'done'
   if (run?.status === 'error') {
     const firstMissing = AGENTS.findIndex(([, outputField]) => !run[outputField])
@@ -24,14 +24,14 @@ function getAgentStatus(run, field, index) {
   }
   if (run?.status === 'complete') return 'done'
   if (run?.status === 'halted_not_relevant') return index === 0 ? 'done' : 'queued'
+  if (run?.status === 'queued') return index === 0 ? 'queued' : 'waiting'
+  if (run?.status === 'awaiting_manual_text') return index === 0 ? 'waiting' : 'queued'
   const activeIndex = STATUS_AGENT_INDEX[run?.status]
   if (activeIndex !== undefined) {
     if (index < activeIndex) return 'done'
     if (index === activeIndex) return 'running'
     return 'queued'
   }
-  const nextMissing = AGENTS.findIndex(([, outputField]) => !run?.[outputField])
-  if (index === nextMissing && (!run?.status || RUNNING_STATES.includes(run.status))) return 'running'
   return 'queued'
 }
 

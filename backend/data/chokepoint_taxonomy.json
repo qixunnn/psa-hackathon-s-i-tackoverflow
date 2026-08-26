@@ -8,11 +8,16 @@
       "Bab el-Mandeb strait",
       "Strait of Bab el-Mandeb"
     ],
+    "Suez Canal": ["Suez"],
     "Strait of Malacca": ["Malacca Strait"]
   },
   "non_chokepoint_regions": [
     "Red Sea",
     "Gulf of Oman",
-    "Arabian Sea"
+    "Arabian Sea",
+    "Mediterranean Sea",
+    "Atlantic Ocean",
+    "Indian Ocean",
+    "Cape of Good Hope"
   ]
 }

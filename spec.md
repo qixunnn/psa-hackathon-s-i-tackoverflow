@@ -69,7 +69,7 @@ reference mockup) plus one **input surface** for the MVP trigger.
 ### 4.1 Dashboard (Home)
 - **Map panel** — the single pre-defined MVP route (origin → PSA Singapore)
   rendered on a 2D map, with the active/affected chokepoint highlighted
-  (e.g. Strait of Hormuz) when a live risk exists.
+  (e.g. Bab el-Mandeb) when a live risk exists.
 - **Route comparison panel** — once an advisory exists, shows the current
   scheduled route vs. top-ranked alternative(s), each with: distance, transit
   days, ETA, delta vs. original ETA, risk exposure summary.
@@ -85,6 +85,11 @@ reference mockup) plus one **input surface** for the MVP trigger.
   "3 alternative routes retrieved", "Advisory generated") for auditability.
 - **Risk trend strip** — small time-series of risk score for the active
   route over recent runs (supports "is this getting worse" at a glance).
+- **Fresh-state causality** — before an article is submitted, the pipeline is
+  idle, the risk panel is neutral, the audit/advisory areas are empty, and the
+  Home map shows only the vessel's scheduled baseline. Static graph
+  alternatives appear on the Home map only after Agent 3 returns them for the
+  current run; ranks and ETA impacts appear only after Agent 4.
 
 ### 4.2 Input: Article URL Submission
 - Single text field: paste an article URL.
@@ -244,12 +249,11 @@ reference mockup) plus one **input surface** for the MVP trigger.
 
 **Single corridor, single live-risk scenario, single vessel.**
 
-- **Route (MVP demo corridor):** Rotterdam (or Jebel Ali) → PSA Singapore.
-- **Primary demo scenario: Strait of Hormuz Tension** — matches a real,
-  well-known chokepoint risk (also aligns with the "Hormuz Tension" scenario
-  category visible in the reference dashboard UI, alongside Red Sea Crisis,
-  Suez, Taiwan Strait). A tension/closure event at Hormuz is used as the
-  scripted demo input article.
+- **Route (MVP demo corridor):** Rotterdam → PSA Singapore.
+- **Primary demo scenario: Bab el-Mandeb Disruption** — a sustained security
+  disruption at Bab el-Mandeb affects the normal Suez/Red Sea corridor. The
+  scripted demo input article describes unsafe or unavailable commercial
+  transit through the strait.
 - **Pre-generated route graph** for this MVP corridor includes at least:
   1. Baseline route (via the affected chokepoint).
   2. 1–2 realistic alternative routes (e.g., re-routing around the
@@ -264,12 +268,12 @@ reference mockup) plus one **input surface** for the MVP trigger.
   multi-article correlation over time, user auth/roles (single operator
   view is fine for demo).
 
-**Demo narrative:** operator pastes a news article about rising Strait of
-Hormuz tensions → pipeline runs end-to-end in view (agent rail lights up
-sequentially) → dashboard shows the corridor's chokepoint flagged, 2 ranked
-alternative routes with ETA deltas, and an advisory recommending PSA flag a
-possible multi-day delay and notify transshipment partners → operator clicks
-Accept, decision logged.
+**Demo narrative:** operator pastes a news article about sustained attacks or
+unsafe transit at Bab el-Mandeb → pipeline runs end-to-end in view (agent rail
+lights up sequentially) → dashboard flags the exposed Suez/Red Sea baseline,
+ranks the predefined Cape of Good Hope bypass with its ETA delta, and produces
+an advisory recommending PSA replan berth, terminal resources, yard, and
+transshipment operations → operator clicks Accept, decision logged.
 
 ---
 
@@ -380,7 +384,6 @@ Accept, decision logged.
 - Severity/ranking scoring weights (risk vs. transit time vs. distance) are
   a first-pass heuristic for MVP and should be tunable, not hard-coded
   long-term.
-- "Strait of Hormuz" is used as the flagship MVP scenario (correcting what
-  appears to be a typo — "strait of hamas" — in the original prompt); this
-  also aligns with the crisis-scenario categories already present in the
-  reference UI mockup.
+- Bab el-Mandeb is the flagship MVP scenario because the Rotterdam → Suez →
+  Red Sea → Singapore baseline directly traverses it and has a deterministic
+  Cape of Good Hope alternative in the pre-generated graph.

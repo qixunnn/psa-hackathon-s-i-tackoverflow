@@ -28,11 +28,11 @@ def client(tmp_path, monkeypatch):
             "relevance_rationale": "The submitted article was assessed against PSA-bound shipping.",
             "summary": "A validated test article.",
             "entities": {
-                "location": "Strait of Hormuz" if relevant else "Domestic market",
+                "location": "Bab el-Mandeb" if relevant else "Domestic market",
                 "event_type": "geopolitical tension" if relevant else "labor dispute",
                 "date": "2026-08-25",
                 "actors": ["Shipping operators"] if relevant else ["Domestic workers"],
-                "chokepoints_mentioned": ["Strait of Hormuz"] if relevant else [],
+                "chokepoints_mentioned": ["Bab el-Mandeb"] if relevant else [],
             },
             "evidence": ["A concise source-backed test excerpt."],
             "source_url": state["source_url"],
@@ -45,7 +45,7 @@ def client(tmp_path, monkeypatch):
             "severity": "High",
             "confidence": 0.88,
             "probability": 0.7,
-            "affected_chokepoints": ["Strait of Hormuz"],
+            "affected_chokepoints": ["Bab el-Mandeb"],
             "estimated_duration": "3-5 days",
             "rationale": "The disruption affects a major shipping chokepoint.",
             "evidence": [event["evidence"][0]],
@@ -55,19 +55,19 @@ def client(tmp_path, monkeypatch):
         return [
             {
                 "run_id": state["run_id"],
-                "route_id": "RT-002-FUJAIRAH-BYPASS",
+                "route_id": "RT-002-CAPE-BYPASS",
                 "rank": 1,
                 "score": 0.8,
-                "eta": "2026-09-06T00:00:00Z",
-                "eta_delta_days": 2,
-                "rationale": "Avoids the affected chokepoint with a modest transit delay.",
+                "eta": "2026-09-30T16:26:26Z",
+                "eta_delta_days": 10,
+                "rationale": "Avoids the affected chokepoint with a longer Cape transit.",
             },
             {
                 "run_id": state["run_id"],
                 "route_id": "RT-001-BASELINE",
                 "rank": 2,
                 "score": 0.6,
-                "eta": "2026-09-04T00:00:00Z",
+                "eta": "2026-09-20T16:26:26Z",
                 "eta_delta_days": 0,
                 "rationale": "Shortest route but remains exposed to the affected chokepoint.",
             },
@@ -76,8 +76,8 @@ def client(tmp_path, monkeypatch):
     def canned_agent5(state):
         return {
             "run_id": state["run_id"],
-            "headline": "Prepare for possible Strait of Hormuz delay",
-            "summary": "A validated disruption may affect PSA-bound arrival timing.",
+            "headline": "Prepare for Cape-route arrival delay",
+            "summary": "A Bab el-Mandeb disruption may delay PSA-bound arrival timing.",
             "recommended_actions": [
                 "Review berth planning",
                 "Notify transshipment partners",
@@ -101,7 +101,7 @@ def wait_for_run(client, run_id):
 
 
 def test_normal_run_completes_with_all_outputs(client):
-    response = client.post("/runs", json={"source_url": "https://example.com/hormuz"})
+    response = client.post("/runs", json={"source_url": "https://example.com/bab-el-mandeb"})
     assert response.status_code == 202
     state = wait_for_run(client, response.json()["run_id"])
 
@@ -135,7 +135,7 @@ def test_invalid_risk_output_stops_pipeline(client, monkeypatch):
         return {"severity": "High"}
 
     monkeypatch.setattr(agent2_risk, "run", invalid_risk)
-    response = client.post("/runs", json={"source_url": "https://example.com/hormuz"})
+    response = client.post("/runs", json={"source_url": "https://example.com/bab-el-mandeb"})
     state = wait_for_run(client, response.json()["run_id"])
 
     assert state["status"] == "error"
@@ -222,10 +222,10 @@ def test_unsupported_valid_chokepoint_is_recorded_in_agent3_event(client, monkey
     assert state["status"] == "complete"
     assert [item["route_id"] for item in state["candidate_routes"]] == [
         "RT-001-BASELINE",
-        "RT-002-FUJAIRAH-BYPASS",
+        "RT-002-CAPE-BYPASS",
     ]
     agent3_event = next(item for item in events if item["agent"] == "agent_3_route_retrieval")
-    assert "unsupported by the MVP graph: Bab el-Mandeb" in agent3_event["message"]
+    assert "unsupported by the MVP graph: Strait of Hormuz" in agent3_event["message"]
 
 
 def test_run_and_event_files_are_valid_json(client):
@@ -254,11 +254,10 @@ def test_routes_endpoint_returns_route_graph(client):
     response = client.get("/routes")
 
     assert response.status_code == 200
-    assert len(response.json()) == 3
+    assert len(response.json()) == 2
     assert {route["route_id"] for route in response.json()} == {
         "RT-001-BASELINE",
-        "RT-002-FUJAIRAH-BYPASS",
-        "RT-003-ESCORTED-TRANSIT",
+        "RT-002-CAPE-BYPASS",
     }
 
 

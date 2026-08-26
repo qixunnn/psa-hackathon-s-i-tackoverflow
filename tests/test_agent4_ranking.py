@@ -45,11 +45,11 @@ def valid_state():
             "relevance_rationale": "The article affects PSA-bound maritime shipping.",
             "summary": "A chokepoint disruption was reported.",
             "entities": {
-                "location": "Strait of Hormuz",
+                "location": "Bab el-Mandeb",
                 "event_type": "maritime disruption",
                 "date": "2026-08-25",
                 "actors": ["Carrier"],
-                "chokepoints_mentioned": ["Strait of Hormuz"],
+                "chokepoints_mentioned": ["Bab el-Mandeb"],
             },
             "evidence": ["Transit through the strait was temporarily suspended."],
             "source_url": "https://example.com/article",
@@ -60,7 +60,7 @@ def valid_state():
             "severity": "High",
             "confidence": 0.87,
             "probability": 0.72,
-            "affected_chokepoints": ["Strait of Hormuz"],
+            "affected_chokepoints": ["Bab el-Mandeb"],
             "estimated_duration": "3-5 days",
             "rationale": "The event may materially disrupt transit.",
             "evidence": ["Transit through the strait was temporarily suspended."],
@@ -73,7 +73,7 @@ def valid_state():
             },
             {
                 "run_id": "run-4",
-                "route_id": "RT-002-FUJAIRAH-BYPASS",
+                "route_id": "RT-002-CAPE-BYPASS",
                 "retrieved_reason": "Avoids the affected chokepoint.",
             },
         ],
@@ -84,12 +84,12 @@ def rationales_payload():
     return {
         "rationales": [
             {
-                "route_id": "RT-002-FUJAIRAH-BYPASS",
-                "rationale": "Avoids Hormuz risk while adding two transit days and 200 nm.",
+                "route_id": "RT-002-CAPE-BYPASS",
+                "rationale": "Avoids Bab el-Mandeb risk while adding ten transit days and 3,400 nm.",
             },
             {
                 "route_id": "RT-001-BASELINE",
-                "rationale": "Preserves the scheduled ETA but remains exposed to Hormuz.",
+                "rationale": "Preserves the scheduled ETA but remains exposed to Bab el-Mandeb.",
             },
         ]
     }
@@ -101,13 +101,13 @@ def test_agent4_weighted_scores_eta_math_and_gemini_rationales():
     ranked = agent4_ranking.run(valid_state(), client=client, settings=SETTINGS)
 
     assert [route["route_id"] for route in ranked] == [
-        "RT-002-FUJAIRAH-BYPASS",
+        "RT-002-CAPE-BYPASS",
         "RT-001-BASELINE",
     ]
-    assert ranked[0]["eta_delta_days"] == 2
+    assert ranked[0]["eta_delta_days"] == 10
     assert ranked[1]["eta_delta_days"] == 0
     assert ranked[0]["score"] > ranked[1]["score"]
-    assert "Avoids Hormuz risk" in ranked[0]["rationale"]
+    assert "Avoids Bab el-Mandeb risk" in ranked[0]["rationale"]
     assert models.calls[0]["config"]["response_json_schema"]["required"] == ["rationales"]
     for route in ranked:
         validate("ranked_route", route)
@@ -128,7 +128,7 @@ def test_agent4_rejects_missing_rationale_for_ranked_route():
         payload={
             "rationales": [
                 {
-                    "route_id": "RT-002-FUJAIRAH-BYPASS",
+                    "route_id": "RT-002-CAPE-BYPASS",
                     "rationale": "Avoids the affected chokepoint.",
                 }
             ]

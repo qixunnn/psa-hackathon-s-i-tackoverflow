@@ -15,11 +15,11 @@ def valid_event(run_id="run-3"):
         "relevance_rationale": "The event affects PSA-bound maritime shipping.",
         "summary": "A maritime chokepoint disruption was reported.",
         "entities": {
-            "location": "Strait of Hormuz",
+            "location": "Bab el-Mandeb",
             "event_type": "maritime security disruption",
             "date": "2026-08-25",
             "actors": ["Carrier"],
-            "chokepoints_mentioned": ["Strait of Hormuz"],
+            "chokepoints_mentioned": ["Bab el-Mandeb"],
         },
         "evidence": ["Transit through a maritime chokepoint was suspended."],
         "source_url": "https://example.com/article",
@@ -49,7 +49,7 @@ def state(affected_chokepoints):
     }
 
 
-def route(route_id, chokepoints, *, origin="Jebel Ali", destination="PSA Singapore"):
+def route(route_id, chokepoints, *, origin="Rotterdam", destination="PSA Singapore"):
     return {
         "route_id": route_id,
         "origin": origin,
@@ -85,20 +85,20 @@ def run_with_graph(agent_state, graph_paths):
     )
 
 
-def test_hormuz_retrieval_retains_baseline_and_predefined_avoiding_alternative():
-    candidates = agent3_route_retrieval.run(state(["Strait of Hormuz"]))
+def test_bab_retrieval_retains_baseline_and_predefined_cape_alternative():
+    candidates = agent3_route_retrieval.run(state(["Bab el-Mandeb"]))
 
     assert [candidate["route_id"] for candidate in candidates] == [
         "RT-001-BASELINE",
-        "RT-002-FUJAIRAH-BYPASS",
+        "RT-002-CAPE-BYPASS",
     ]
-    assert "Strait of Hormuz" in candidates[0]["retrieved_reason"]
+    assert "Bab el-Mandeb" in candidates[0]["retrieved_reason"]
     assert "avoids" in candidates[1]["retrieved_reason"]
 
     routes = json.loads(agent3_route_retrieval.ROUTE_GRAPH_PATH.read_text(encoding="utf-8"))
     routes_by_id = {item["route_id"]: item for item in routes}
-    assert "Strait of Hormuz" in routes_by_id[candidates[0]["route_id"]]["chokepoints"]
-    assert "Strait of Hormuz" not in routes_by_id[candidates[1]["route_id"]]["chokepoints"]
+    assert "Bab el-Mandeb" in routes_by_id[candidates[0]["route_id"]]["chokepoints"]
+    assert "Bab el-Mandeb" not in routes_by_id[candidates[1]["route_id"]]["chokepoints"]
 
 
 def test_multiple_alternatives_use_stable_route_id_order(tmp_path):
@@ -143,27 +143,27 @@ def test_unknown_chokepoint_reaching_agent3_fails_explicitly():
 
 
 def test_recognized_chokepoint_absent_from_graph_is_not_unknown():
-    agent_state = state(["Bab el-Mandeb"])
+    agent_state = state(["Strait of Hormuz"])
 
     assert agent3_route_retrieval.run(agent_state) == []
     assert agent3_route_retrieval.graph_coverage(agent_state) == (
         [],
-        ["Bab el-Mandeb"],
+        ["Strait of Hormuz"],
     )
 
 
-def test_bab_el_mandeb_plus_hormuz_retrieves_using_supported_hormuz():
+def test_bab_el_mandeb_plus_hormuz_retrieves_using_supported_bab():
     agent_state = state(["Bab el-Mandeb", "Strait of Hormuz"])
 
     candidates = agent3_route_retrieval.run(agent_state)
 
     assert [candidate["route_id"] for candidate in candidates] == [
         "RT-001-BASELINE",
-        "RT-002-FUJAIRAH-BYPASS",
+        "RT-002-CAPE-BYPASS",
     ]
     assert agent3_route_retrieval.graph_coverage(agent_state) == (
-        ["Strait of Hormuz"],
         ["Bab el-Mandeb"],
+        ["Strait of Hormuz"],
     )
 
 
@@ -194,7 +194,7 @@ def test_missing_baseline_route_reference_fails_explicitly(tmp_path):
 
 
 def test_repeated_execution_is_identical_and_does_not_mutate_input():
-    agent_state = state(["Strait of Hormuz"])
+    agent_state = state(["Bab el-Mandeb"])
     original = copy.deepcopy(agent_state)
 
     first = agent3_route_retrieval.run(agent_state)
@@ -207,7 +207,7 @@ def test_repeated_execution_is_identical_and_does_not_mutate_input():
 def test_agent3_requires_no_gemini_api_key(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
-    candidates = agent3_route_retrieval.run(state(["Strait of Hormuz"]))
+    candidates = agent3_route_retrieval.run(state(["Bab el-Mandeb"]))
 
     assert candidates
 
@@ -224,7 +224,7 @@ def test_input_risk_assessment_is_validated_before_graph_access(tmp_path):
 
 
 def test_outputs_and_accumulated_run_validate():
-    agent_state = state(["Strait of Hormuz"])
+    agent_state = state(["Bab el-Mandeb"])
     candidates = agent3_route_retrieval.run(agent_state)
 
     for candidate in candidates:
@@ -237,6 +237,6 @@ def test_candidate_route_ids_all_reference_graph_records():
     routes = json.loads(agent3_route_retrieval.ROUTE_GRAPH_PATH.read_text(encoding="utf-8"))
     route_ids = {item["route_id"] for item in routes}
 
-    candidates = agent3_route_retrieval.run(state(["Strait of Hormuz"]))
+    candidates = agent3_route_retrieval.run(state(["Bab el-Mandeb"]))
 
     assert {candidate["route_id"] for candidate in candidates} <= route_ids

@@ -1,7 +1,6 @@
 const ROUTE_NAMES = {
   'RT-001-BASELINE': 'Baseline route',
-  'RT-002-FUJAIRAH-BYPASS': 'Fujairah bypass',
-  'RT-003-ESCORTED-TRANSIT': 'Escorted transit',
+  'RT-002-CAPE-BYPASS': 'Cape bypass',
 }
 
 export function routeName(routeId) {
@@ -21,6 +20,38 @@ export function selectedRouteFromState(run, routes = [], vessel = null) {
     eta: rankedSelection?.eta || vessel?.scheduled_arrival || null,
     eta_delta_days: rankedSelection?.eta_delta_days ?? 0,
     is_scheduled_fallback: !rankedSelection,
+  }
+}
+
+export function operationalRoutesFromState(routes = [], vessel = null, run = null) {
+  if (!vessel?.scheduled_route_id) return []
+  const visibleRouteIds = new Set([vessel.scheduled_route_id])
+  for (const candidate of run?.candidate_routes || []) {
+    visibleRouteIds.add(candidate.route_id)
+  }
+  return routes.filter((route) => visibleRouteIds.has(route.route_id))
+}
+
+export function riskScenarioFromState(run) {
+  const assessment = run?.risk_assessment
+  if (!assessment) {
+    return {
+      active: false,
+      title: 'Awaiting intelligence assessment',
+      severity: 'IDLE',
+      chokepoint: '—',
+      probability: '—',
+      duration: '—',
+    }
+  }
+  const chokepoint = assessment.affected_chokepoints?.[0] || null
+  return {
+    active: true,
+    title: `${chokepoint || 'Maritime'} disruption`,
+    severity: assessment.severity,
+    chokepoint: chokepoint || '—',
+    probability: `${Math.round(assessment.probability * 100)}%`,
+    duration: assessment.estimated_duration || '—',
   }
 }
 
@@ -44,7 +75,7 @@ export function routeLayerStyle(routeId, selectedRouteId, scheduledRouteId) {
   return {
     lineWidth: isSelected ? 5 : isMutedBaseline ? 2.4 : 1.6,
     lineOpacity: isSelected ? 1 : isMutedBaseline ? 0.38 : 0.2,
-    lineDasharray: isSelected ? [1, 0] : isMutedBaseline || routeId === 'RT-003-ESCORTED-TRANSIT' ? [2, 2] : [1, 0],
+    lineDasharray: isSelected ? [1, 0] : isMutedBaseline ? [2, 2] : [1, 0],
     glowOpacity: isSelected ? 0.28 : 0,
   }
 }

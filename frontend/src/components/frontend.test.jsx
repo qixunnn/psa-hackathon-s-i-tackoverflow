@@ -31,6 +31,21 @@ describe('UrlSubmitForm', () => {
 })
 
 describe('AgentPipelineRail', () => {
+  it('shows an explicit idle/waiting pipeline before any run exists', () => {
+    render(<AgentPipelineRail run={null} />)
+    expect(screen.getByText('Relevance & Extraction').nextElementSibling).toHaveTextContent('idle')
+    expect(screen.getByText('Risk & Severity').nextElementSibling).toHaveTextContent('waiting')
+    expect(screen.getByText('Route Retrieval').nextElementSibling).toHaveTextContent('waiting')
+    expect(screen.queryByText('running')).not.toBeInTheDocument()
+  })
+
+  it('does not claim an agent is running while a submitted run is still queued', () => {
+    render(<AgentPipelineRail run={{ status: 'queued' }} />)
+    expect(screen.getByText('Relevance & Extraction').nextElementSibling).toHaveTextContent('queued')
+    expect(screen.getByText('Risk & Severity').nextElementSibling).toHaveTextContent('waiting')
+    expect(screen.queryByText('running')).not.toBeInTheDocument()
+  })
+
   it('derives done, running, and queued statuses from accumulated run data', () => {
     render(<AgentPipelineRail run={{ status: 'assessing_risk', event: { relevant: true } }} />)
     expect(screen.getByText('Relevance & Extraction').nextElementSibling).toHaveTextContent('done')
@@ -49,6 +64,13 @@ describe('AgentPipelineRail', () => {
 
 describe('AdvisoryCard', () => {
   const completeRun = { run_id: 'run-1', status: 'complete', advisory: { headline: 'Delay risk', summary: 'Review the voyage.', confidence: 0.85, recommended_actions: ['Review berth'], operator_decision: 'pending' }, risk_assessment: { rationale: 'Risk rationale' }, ranked_routes: [] }
+
+  it('remains empty before a run or Agent 5 output exists', () => {
+    const { rerender } = render(<AdvisoryCard run={null} />)
+    expect(screen.getByText(/Advisory will appear when the run completes/)).toBeInTheDocument()
+    rerender(<AdvisoryCard run={{ run_id: 'run-1', status: 'advising' }} />)
+    expect(screen.getByText(/Advisory will appear when the run completes/)).toBeInTheDocument()
+  })
 
   it('renders a neutral not-relevant outcome without decisions', () => {
     render(<AdvisoryCard run={{ status: 'halted_not_relevant', event: { summary: 'Domestic labor dispute.', confidence: 0.92 } }} />)
@@ -120,15 +142,15 @@ describe('HistoryPanel', () => {
 
 describe('RouteGraphViewer', () => {
   const routes = [
-    { route_id: 'RT-001-BASELINE', origin: 'Jebel Ali', destination: 'PSA Singapore', waypoints: ['Jebel Ali', 'Strait of Hormuz', 'PSA Singapore'], chokepoints: ['Strait of Hormuz'], distance_nm: 3900, base_transit_days: 11 },
-    { route_id: 'RT-002-FUJAIRAH-BYPASS', origin: 'Jebel Ali', destination: 'PSA Singapore', waypoints: ['Jebel Ali', 'Gulf of Oman', 'PSA Singapore'], chokepoints: [], distance_nm: 4100, base_transit_days: 13 },
+    { route_id: 'RT-001-BASELINE', origin: 'Rotterdam', destination: 'PSA Singapore', waypoints: ['Rotterdam', 'Suez Canal', 'Bab el-Mandeb', 'PSA Singapore'], chokepoints: ['Suez Canal', 'Bab el-Mandeb'], distance_nm: 8300, base_transit_days: 24 },
+    { route_id: 'RT-002-CAPE-BYPASS', origin: 'Rotterdam', destination: 'PSA Singapore', waypoints: ['Rotterdam', 'Cape of Good Hope', 'PSA Singapore'], chokepoints: [], distance_nm: 11700, base_transit_days: 34 },
   ]
 
   it('marks the scheduled baseline and the routes exposed to the live risk', () => {
-    render(<RouteGraphViewer routes={routes} vessel={{ vessel_name: 'MV Pacific Voyager', scheduled_route_id: 'RT-001-BASELINE', scheduled_arrival: '2026-09-04T16:26:26Z' }} affectedChokepoints={['Strait of Hormuz']} />)
+    render(<RouteGraphViewer routes={routes} vessel={{ vessel_name: 'MV Pacific Voyager', scheduled_route_id: 'RT-001-BASELINE', scheduled_arrival: '2026-09-20T16:26:26Z' }} affectedChokepoints={['Bab el-Mandeb']} />)
     expect(screen.getByText('Scheduled baseline')).toBeInTheDocument()
     expect(screen.getByText('Exposed')).toBeInTheDocument()
-    expect(screen.getByText('3,900 nm')).toBeInTheDocument()
+    expect(screen.getByText('8,300 nm')).toBeInTheDocument()
     expect(screen.getByText('MV Pacific Voyager')).toBeInTheDocument()
   })
 
@@ -140,13 +162,26 @@ describe('RouteGraphViewer', () => {
 })
 
 describe('RouteComparisonPanel', () => {
+  it('shows Agent 3 candidates without ETA impact before Agent 4 completes', () => {
+    render(<RouteComparisonPanel
+      run={{ candidate_routes: [{ route_id: 'RT-001-BASELINE' }, { route_id: 'RT-002-CAPE-BYPASS' }] }}
+      routes={[
+        { route_id: 'RT-001-BASELINE', distance_nm: 8300, base_transit_days: 24, chokepoints: ['Bab el-Mandeb'] },
+        { route_id: 'RT-002-CAPE-BYPASS', distance_nm: 11700, base_transit_days: 34, chokepoints: ['Strait of Malacca'] },
+      ]}
+    />)
+    expect(screen.getByText('2 candidates')).toBeInTheDocument()
+    expect(screen.getAllByText('Pending Agent 4')).toHaveLength(2)
+    expect(screen.queryByText('+10d')).not.toBeInTheDocument()
+  })
+
   it('joins ranked routes to graph routes by route_id', () => {
     render(<RouteComparisonPanel run={{ ranked_routes: [{ route_id: 'RT-002', rank: 1, eta: '2026-09-01T00:00:00Z', eta_delta_days: 2 }, { route_id: 'RT-001', rank: 2, eta: '2026-08-30T00:00:00Z', eta_delta_days: 0 }] }} routes={[{ route_id: 'RT-002', distance_nm: 4100, base_transit_days: 13, chokepoints: ['Malacca'] }, { route_id: 'RT-001', distance_nm: 3900, base_transit_days: 11, chokepoints: ['Hormuz'] }]} />)
     expect(screen.getByText(/RT-002/)).toBeInTheDocument()
-    expect(screen.getByText('4100')).toBeInTheDocument()
+    expect(screen.getByText('4,100')).toBeInTheDocument()
     expect(screen.getByText('13')).toBeInTheDocument()
     expect(screen.getByText(/RT-001/)).toBeInTheDocument()
-    expect(screen.getByText('3900')).toBeInTheDocument()
+    expect(screen.getByText('3,900')).toBeInTheDocument()
     expect(screen.getByText('11')).toBeInTheDocument()
   })
 })
