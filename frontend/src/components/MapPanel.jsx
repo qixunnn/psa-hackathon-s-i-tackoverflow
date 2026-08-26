@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { formatEta, formatEtaDelta, graphAffectedChokepoints, routeLayerStyle, routeName } from '../lib/routePresentation'
 
 const ROUTE_COORDINATES = {
   'RT-001-BASELINE': [[55.03,24.99],[55.35,25.18],[56.25,26.55],[57.1,24.4],[61.5,20.2],[66.5,14.2],[72.5,9.2],[79.8,6.1],[87.2,5.5],[94.8,6.4],[99.65,5.55],[101.3,3.15],[103.82,1.26]],
@@ -21,10 +22,12 @@ function makeMarker(map, coordinates, label, kind='') {
   return new maplibregl.Marker({ element:marker, anchor:'center' }).setLngLat(coordinates).addTo(map)
 }
 
-export default function MapPanel({ run, routes=[], viewMode='2D' }) {
+export default function MapPanel({ run, routes=[], vessel=null, selectedRoute=null, viewMode='2D' }) {
   const mapNode = useRef(null)
   const mapInstance = useRef(null)
   const affected = run?.risk_assessment?.affected_chokepoints || []
+  const mappedAffected = graphAffectedChokepoints(affected, routes)
+  const hormuzRiskActive = mappedAffected.includes('Strait of Hormuz')
 
   useEffect(() => {
     if (!mapNode.current || mapInstance.current) return undefined
@@ -37,8 +40,8 @@ export default function MapPanel({ run, routes=[], viewMode='2D' }) {
       displayRoutes.filter(route => ROUTE_COORDINATES[route.route_id]).sort((a,b) => a.route_id === 'RT-001-BASELINE' ? 1 : b.route_id === 'RT-001-BASELINE' ? -1 : 0).forEach(route => {
         const id = route.route_id
         map.addSource(id, { type:'geojson', data:routeFeature(route) })
-        map.addLayer({ id:`${id}-glow`, type:'line', source:id, paint:{ 'line-color':ROUTE_COLORS[id], 'line-width':8, 'line-opacity':.15 } })
-        map.addLayer({ id, type:'line', source:id, paint:{ 'line-color':ROUTE_COLORS[id], 'line-width':id==='RT-001-BASELINE'?3.5:1.8, 'line-opacity':id==='RT-001-BASELINE'?.95:.32, 'line-dasharray':id==='RT-003-ESCORTED-TRANSIT'?[2,2]:[1,0] } })
+        map.addLayer({ id:`${id}-glow`, type:'line', source:id, paint:{ 'line-color':ROUTE_COLORS[id], 'line-width':8, 'line-opacity':0 } })
+        map.addLayer({ id, type:'line', source:id, paint:{ 'line-color':ROUTE_COLORS[id], 'line-width':1.8, 'line-opacity':.25, 'line-dasharray':id==='RT-003-ESCORTED-TRANSIT'?[2,2]:[1,0] } })
       })
       map.addSource('hormuz-risk', { type:'geojson', data:{ type:'Feature', properties:{}, geometry:{ type:'Polygon', coordinates:[[[55.45,25.65],[56,27.15],[57,27.05],[57.2,25.65],[56.25,25.15],[55.45,25.65]]] } } })
       map.addLayer({ id:'hormuz-risk-fill', type:'fill', source:'hormuz-risk', paint:{ 'fill-color':'#d86662', 'fill-opacity':0, 'fill-outline-color':'#ef8a7f' } })
@@ -60,19 +63,24 @@ export default function MapPanel({ run, routes=[], viewMode='2D' }) {
     const map = mapInstance.current
     if (!map) return undefined
     const applyRunState = () => {
-      if (map.getLayer('hormuz-risk-fill')) map.setPaintProperty('hormuz-risk-fill', 'fill-opacity', affected.length ? .26 : 0)
-      const ranked = new Map((run?.ranked_routes || []).map((route) => [route.route_id, route.rank]))
+      if (map.getLayer('hormuz-risk-fill')) map.setPaintProperty('hormuz-risk-fill', 'fill-opacity', hormuzRiskActive ? .26 : 0)
       Object.keys(ROUTE_COORDINATES).forEach((id) => {
         if (!map.getLayer(id)) return
-        const rank = ranked.get(id)
-        map.setPaintProperty(id, 'line-width', rank === 1 ? 4 : rank ? 2.5 : id === 'RT-001-BASELINE' ? 3.5 : 1.8)
-        map.setPaintProperty(id, 'line-opacity', rank === 1 ? 1 : rank ? .65 : id === 'RT-001-BASELINE' ? .95 : .32)
+        const style = routeLayerStyle(id, selectedRoute?.route_id, vessel?.scheduled_route_id)
+        map.setPaintProperty(id, 'line-width', style.lineWidth)
+        map.setPaintProperty(id, 'line-opacity', style.lineOpacity)
+        map.setPaintProperty(id, 'line-dasharray', style.lineDasharray)
+        if (map.getLayer(`${id}-glow`)) map.setPaintProperty(`${id}-glow`, 'line-opacity', style.glowOpacity)
       })
+      if (selectedRoute?.route_id && map.getLayer(selectedRoute.route_id)) {
+        map.moveLayer(`${selectedRoute.route_id}-glow`)
+        map.moveLayer(selectedRoute.route_id)
+      }
     }
     if (map.isStyleLoaded()) applyRunState()
     else map.once('load', applyRunState)
     return () => map.off('load', applyRunState)
-  }, [run, affected.length])
+  }, [hormuzRiskActive, routes, run, selectedRoute?.route_id, vessel?.scheduled_route_id])
 
-  return <section className={`world-map ${affected.length ? 'risk-active' : ''}`} aria-label="Geographic map of the Jebel Ali to PSA Singapore corridor"><div ref={mapNode} className="maplibre-host"/><div className="map-vessel-card"><span>ACTIVE VESSEL</span><strong>MV Pacific Voyager</strong><small>Scheduled arrival · 04 Sep 2026</small></div><div className={`map-live-state ${affected.length?'alert':''}`}><span/> {affected.length?`${affected.join(', ')} RISK ACTIVE`:'MONITORING MVP CORRIDOR'}</div></section>
+  return <section className={`world-map ${hormuzRiskActive ? 'risk-active' : ''}`} aria-label="Geographic map of the Jebel Ali to PSA Singapore corridor"><div ref={mapNode} className="maplibre-host"/><div className="map-vessel-card"><span>ACTIVE VESSEL</span><strong>{vessel?.vessel_name || 'Vessel pending'}</strong><dl><div><dt>Selected route</dt><dd>{selectedRoute ? `${selectedRoute.route_id} · ${routeName(selectedRoute.route_id)}` : 'Pending'}</dd></div><div><dt>Revised ETA</dt><dd>{formatEta(selectedRoute?.eta)}</dd></div><div><dt>ETA impact</dt><dd className={selectedRoute?.eta_delta_days > 0 ? 'delay' : ''}>{formatEtaDelta(selectedRoute?.eta_delta_days)}</dd></div></dl></div><div className={`map-live-state ${mappedAffected.length?'alert':''}`}><span/> {mappedAffected.length?`${mappedAffected.join(', ')} RISK ACTIVE`:'MONITORING MVP CORRIDOR'}</div></section>
 }

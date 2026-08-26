@@ -12,6 +12,7 @@ import RiskTrendStrip from './components/RiskTrendStrip'
 import RouteComparisonPanel from './components/RouteComparisonPanel'
 import RouteGraphViewer from './components/RouteGraphViewer'
 import { getRoutes, getVessel, listRuns } from './lib/api'
+import { formatEtaDelta, routeName, selectedRouteFromState } from './lib/routePresentation'
 import { useRunStream } from './lib/useRunStream'
 
 const NAV = [
@@ -28,6 +29,9 @@ export default function Dashboard() {
   const [viewMode, setViewMode] = useState('2D')
   const [view, setView] = useState('home')
   const { status, run, events, isLoading } = useRunStream(runId)
+  const selectedRoute = selectedRouteFromState(run, routes, vessel)
+  const affectedChokepoints = run?.risk_assessment?.affected_chokepoints || []
+  const hormuzRiskActive = affectedChokepoints.includes('Strait of Hormuz')
 
   const refreshRuns = useCallback(() => { listRuns().then(setRecentRuns).catch(() => {}) }, [])
 
@@ -69,20 +73,24 @@ export default function Dashboard() {
 
     <div className="command-layout">
       <section className="operations-canvas">
-        <MapPanel run={run} routes={routes} viewMode={viewMode} />
+        <MapPanel run={run} routes={routes} vessel={vessel} selectedRoute={selectedRoute} viewMode={viewMode} />
         <aside className="map-controls floating-panel">
           <div className="floating-title"><span><Layers3 size={15} /> Map controls</span><ChevronDown size={14} /></div>
           <div className="control-content">
             <div className="control-card-heading"><strong>MVP corridor</strong><span>LIVE</span></div>
             <dl className="map-stat-grid"><div><dt>Graph routes</dt><dd>{routes.length || 3}</dd></div><div><dt>Ports</dt><dd>2</dd></div><div><dt>Active vessels</dt><dd>1</dd></div><div><dt>View</dt><dd>{viewMode} map</dd></div></dl>
             <div className="corridor-copy"><b>Jebel Ali</b><span>→</span><b>PSA Singapore</b></div>
-            <div className="legend"><strong>Route graph</strong><span><i className="legend-line baseline" /> Baseline · 3,900 nm</span><span><i className="legend-line bypass" /> Fujairah bypass · 4,100 nm</span><span><i className="legend-line escorted" /> Escorted transit · 3,900 nm</span><span><i className="legend-box risk" /> Hormuz risk zone</span></div>
+            <div className="legend"><strong>Route graph</strong>{routes.map((route) => {
+              const isSelected = route.route_id === selectedRoute?.route_id
+              const routeClass = route.route_id === 'RT-001-BASELINE' ? 'baseline' : route.route_id === 'RT-002-FUJAIRAH-BYPASS' ? 'bypass' : 'escorted'
+              return <span className={`legend-route ${isSelected ? 'selected' : 'muted'}`} key={route.route_id}><i className={`legend-line ${routeClass}`} /><span>{routeName(route.route_id)} · {route.distance_nm.toLocaleString()} nm</span>{isSelected && <em>SELECTED · {formatEtaDelta(selectedRoute.eta_delta_days)}</em>}</span>
+            })}<span><i className="legend-box risk" /> Hormuz risk zone</span></div>
           </div>
         </aside>
         <aside className="scenario-panel floating-panel">
-          <div className="floating-title"><span><Activity size={15} /> Risk scenario</span><span className="alert-count">{run?.risk_assessment ? 'ACTIVE' : 'STANDBY'}</span></div>
-          <div className="scenario-list"><div className={`scenario ${run?.risk_assessment ? 'critical' : ''}`}><span>Hormuz tension</span><small>{run?.risk_assessment?.severity || 'AWAITING'}</small></div></div>
-          <div className="scenario-detail"><span>Chokepoint</span><b>Strait of Hormuz</b><span>Probability</span><b>{run?.risk_assessment ? `${Math.round(run.risk_assessment.probability * 100)}%` : 'Awaiting scan'}</b><span>Duration</span><b>{run?.risk_assessment?.estimated_duration || 'Awaiting scan'}</b></div>
+          <div className="floating-title"><span><Activity size={15} /> Risk scenario</span><span className="alert-count">{hormuzRiskActive ? 'ACTIVE' : 'STANDBY'}</span></div>
+          <div className="scenario-list"><div className={`scenario ${hormuzRiskActive ? 'critical' : ''}`}><span>Hormuz tension</span><small>{hormuzRiskActive ? run.risk_assessment.severity : 'AWAITING'}</small></div></div>
+          <div className="scenario-detail"><span>Chokepoint</span><b>Strait of Hormuz</b><span>Probability</span><b>{hormuzRiskActive ? `${Math.round(run.risk_assessment.probability * 100)}%` : 'Awaiting scan'}</b><span>Duration</span><b>{hormuzRiskActive ? run.risk_assessment.estimated_duration : 'Awaiting scan'}</b></div>
         </aside>
         <div className="scan-dock"><UrlSubmitForm onRunCreated={setRunId} /></div>
         <section className="bottom-console">

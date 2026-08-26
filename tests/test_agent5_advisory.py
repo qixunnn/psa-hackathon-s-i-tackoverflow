@@ -109,6 +109,10 @@ def test_agent5_generates_valid_advisory_from_gemini_fields():
     assert advisory["confidence"] == 0.83
     assert advisory["headline"] == "Prepare for possible Hormuz-driven delay"
     assert models.calls[0]["config"]["response_mime_type"] == "application/json"
+    system_instruction = " ".join(models.calls[0]["config"]["system_instruction"].split())
+    assert "PSA's operational control" in system_instruction
+    assert "alter vessel navigation, routing, vessel speed" in system_instruction
+    assert "PSA may identify or monitor a route selected by the shipping line" in system_instruction
     assert "ranked_routes" in models.calls[0]["contents"]
 
 
